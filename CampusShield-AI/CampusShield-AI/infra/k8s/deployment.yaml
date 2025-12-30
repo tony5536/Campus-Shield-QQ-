@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: campus-shield-ai
+  labels:
+    app: campus-shield-ai
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: campus-shield-ai
+  template:
+    metadata:
+      labels:
+        app: campus-shield-ai
+    spec:
+      containers:
+      - name: backend
+        image: your-backend-image:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          value: "your-database-url"
+        - name: REDIS_URL
+          value: "your-redis-url"
+      - name: frontend
+        image: your-frontend-image:latest
+        ports:
+        - containerPort: 3000
+      - name: ai
+        image: your-ai-image:latest
+        ports:
+        - containerPort: 5000
+      - name: edge
+        image: your-edge-image:latest
+        ports:
+        - containerPort: 4000

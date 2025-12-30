@@ -1,0 +1,33 @@
+{
+  "name": "CampusShield AI",
+  "version": "1.0.0",
+  "description": "A Smart Campus Safety & Emergency Response System",
+  "main": "src/backend/app/main.py",
+  "scripts": {
+    "start": "node src/frontend/web/src/main.tsx",
+    "build": "webpack --config webpack.config.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
+    "react-native": "^0.64.2",
+    "express": "^4.17.1",
+    "fastify": "^3.21.0",
+    "axios": "^0.21.1"
+  },
+  "devDependencies": {
+    "typescript": "^4.4.3",
+    "webpack": "^5.51.1",
+    "jest": "^27.0.6",
+    "eslint": "^7.32.0"
+  },
+  "keywords": [
+    "campus",
+    "safety",
+    "emergency",
+    "AI"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

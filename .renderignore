@@ -1,0 +1,21 @@
+# Ignore local development artifacts and large node deps
+node_modules/
+**/node_modules/
+.vscode/
+.venv/
+venv/
+.env
+*.pyc
+__pycache__/
+.DS_Store
+/dist/
+build/
+
+# Ignore local frontend build artifacts (if any)
+dashboard/dist/
+
+# Ignore user-specific files
+*.local
+
+# Ignore IDE/workspace files
+*.code-workspace

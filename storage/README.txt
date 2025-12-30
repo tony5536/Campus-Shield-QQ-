@@ -1,0 +1,1 @@
+Storage folders for clips, logs, and embeddings. Ensure these exist and are writable.

@@ -1,0 +1,24 @@
+FROM python:3.9-slim
+
+# Set the working directory
+WORKDIR /app
+
+# Copy the requirements file
+COPY pyproject.toml .
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the application code
+COPY ./src/backend ./src/backend
+COPY ./src/ai ./src/ai
+COPY ./src/data ./src/data
+COPY ./src/edge ./src/edge
+COPY ./src/common ./src/common
+COPY ./src/frontend ./src/frontend
+
+# Expose the application port
+EXPOSE 8000
+
+# Command to run the application
+CMD ["uvicorn", "src/backend/server:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

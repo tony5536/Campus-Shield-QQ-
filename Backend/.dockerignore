@@ -1,0 +1,68 @@
+# Docker build context ignore patterns
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+docs/
+*.md
+LICENSE
+
+# Development
+.env
+.env.local
+.env.*.local
+*.sqlite
+*.sqlite3
+backend.db
+
+# OS
+Thumbs.db
+.DS_Store
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.circleci/
+
+# Project-specific
+notebooks/
+models/checkpoints/
+storage/clips/
+edge/
+dashboard/
+mobile/
+CampusShield-AI/
+infra/
+tests/

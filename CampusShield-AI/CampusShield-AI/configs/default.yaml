@@ -1,0 +1,52 @@
+default.yaml
+
+app:
+  name: CampusShield AI
+  version: 1.0.0
+
+database:
+  url: postgres://user:password@localhost:5432/campussafety
+  pool_size: 10
+  max_overflow: 5
+
+logging:
+  level: INFO
+  format: '[%(asctime)s] %(levelname)s in %(module)s: %(message)s'
+  file: logs/app.log
+
+emergency:
+  alert_threshold: 5
+  notification_channels:
+    - email
+    - sms
+    - push_notification
+
+ai:
+  vision:
+    model_path: models/checkpoints/vision_model.pth
+    confidence_threshold: 0.7
+  nlp:
+    model_path: models/checkpoints/nlp_model.pth
+    intent_recognition_threshold: 0.8
+
+frontend:
+  web:
+    api_base_url: http://localhost:8000/api
+  mobile:
+    api_base_url: http://localhost:8000/api
+
+edge:
+  camera:
+    resolution: 1080p
+    frame_rate: 30
+  iot_gateway:
+    timeout: 5
+
+security:
+  jwt_secret: your_jwt_secret
+  token_expiration: 3600
+
+features:
+  incident_reporting: true
+  real_time_monitoring: true
+  emergency_notifications: true

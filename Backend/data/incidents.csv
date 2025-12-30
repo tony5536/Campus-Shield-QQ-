@@ -1,0 +1,27 @@
+incident_id,incident_type,location,zone,timestamp,source,severity_expected,description
+1,Fight,Hostel,Block A - Ground Floor,2025-01-27T14:30:00,CCTV,High,Two students engaged in physical altercation near hostel entrance. Multiple witnesses present. Security intervention required.
+2,Fire,Laboratory,Chemistry Lab - 3rd Floor,2025-01-27T10:15:00,Sensor,High,Smoke detector activated in chemistry laboratory. Possible chemical reaction or equipment malfunction detected.
+3,Intrusion,Main Gate,Main Entrance,2025-01-27T22:45:00,CCTV,High,Unauthorized individual attempting to enter campus after hours. Person does not match registered visitor database.
+4,Medical Emergency,Playground,Sports Field,2025-01-27T16:20:00,Manual,High,Student collapsed during sports activity. Requires immediate medical attention. Ambulance requested.
+5,Theft,Library,Reading Hall - 2nd Floor,2025-01-27T11:00:00,CCTV,Medium,Personal belongings stolen from unattended study table. Laptop and bag reported missing by student.
+6,Suspicious Activity,Parking Area,Parking Lot B,2025-01-27T20:30:00,CCTV,Medium,Unknown vehicle parked in restricted faculty area. Occupant observed loitering near building entrance.
+7,Crowd Gathering,Academic Block,Main Auditorium,2025-01-27T12:00:00,CCTV,Low,Large gathering of students for event. Normal activity but monitoring required for capacity management.
+8,Intrusion,Hostel,Block C - Rear Entrance,2025-01-27T23:15:00,Sensor,High,Motion sensor triggered at rear entrance after curfew hours. No authorized access scheduled.
+9,Medical Emergency,Library,Study Area - 1st Floor,2025-01-27T15:45:00,Manual,Medium,Student experiencing breathing difficulties. First aid administered. Medical team notified.
+10,Fight,Playground,Basketball Court,2025-01-27T17:30:00,CCTV,Medium,Verbal argument escalated between two groups. Security personnel dispatched to de-escalate situation.
+11,Theft,Parking Area,Parking Lot A,2025-01-27T09:00:00,Manual,Medium,Vehicle break-in reported. Car window smashed and items removed from vehicle.
+12,Suspicious Activity,Academic Block,Corridor - 2nd Floor,2025-01-27T13:20:00,CCTV,Low,Individual observed checking multiple locked doors. May be lost or require assistance.
+13,Fire,Hostel,Block B - Kitchen Area,2025-01-27T18:00:00,Sensor,High,Fire alarm activated in hostel kitchen. Possible cooking incident. Fire department notified.
+14,Crowd Gathering,Main Gate,Entrance Plaza,2025-01-27T08:30:00,CCTV,Low,Morning rush hour crowd at main entrance. Normal traffic but monitoring for safety compliance.
+15,Intrusion,Laboratory,Physics Lab - 4th Floor,2025-01-27T21:00:00,Sensor,High,Unauthorized access attempt to restricted laboratory after hours. Security badge not recognized.
+16,Medical Emergency,Playground,Track Field,2025-01-27T19:15:00,Manual,Medium,Student injured during track practice. Ankle injury reported. Medical assistance on site.
+17,Suspicious Activity,Hostel,Block A - Common Area,2025-01-27T22:00:00,CCTV,Medium,Unknown person observed entering hostel without proper identification. Security verification required.
+18,Theft,Library,Computer Lab,2025-01-27T14:00:00,Manual,Low,Equipment cable reported missing. Minor theft incident. Investigation ongoing.
+19,Fight,Academic Block,Corridor - 1st Floor,2025-01-27T11:30:00,CCTV,Medium,Dispute between students in hallway. Verbal exchange observed. Security monitoring situation.
+20,Crowd Gathering,Playground,Main Field,2025-01-27T16:00:00,CCTV,Low,Sports event in progress. Large crowd present. Normal activity with standard monitoring.
+21,Fire,Academic Block,Electrical Room - Basement,2025-01-27T10:45:00,Sensor,High,Smoke detected in electrical room. Possible electrical fault. Immediate evacuation initiated.
+22,Intrusion,Parking Area,Parking Lot C,2025-01-27T19:45:00,CCTV,Medium,Vehicle attempting unauthorized entry through exit gate. License plate captured for investigation.
+23,Medical Emergency,Hostel,Block D - Room 205,2025-01-27T02:30:00,Manual,High,Medical emergency reported in student room. Ambulance dispatched immediately.
+24,Suspicious Activity,Laboratory,Biology Lab - 2nd Floor,2025-01-27T15:00:00,CCTV,Low,Individual observed after hours in laboratory. May be authorized researcher. Verification needed.
+25,Theft,Playground,Equipment Storage,2025-01-27T20:00:00,Manual,Medium,Sports equipment reported missing from storage area. Inventory check required.
+

@@ -1,0 +1,2 @@
+# Top-level requirements file. Delegates to backend requirements.
+-r Backend/requirements.txt

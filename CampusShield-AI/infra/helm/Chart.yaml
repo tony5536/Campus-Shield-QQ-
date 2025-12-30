@@ -1,0 +1,15 @@
+name: CampusShield AI
+version: 0.1.0
+description: A Helm chart for deploying the CampusShield AI Smart Campus Safety & Emergency Response System.
+type: application
+keywords:
+  - campus
+  - safety
+  - emergency
+  - response
+maintainers:
+  - name: Your Name
+    email: your.email@example.com
+sources:
+  - https://github.com/your-repo/CampusShield-AI
+dependencies: []

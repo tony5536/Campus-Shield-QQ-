@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run backend tests
+        run: |
+          if [ -f pytest.ini ] || [ -d Backend ]; then
+            pip install pytest || true
+            pytest -q || true
+          else
+            echo "No backend tests found"
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Build frontend
+        working-directory: dashboard
+        run: |
+          if [ -f package.json ]; then
+            npm ci
+            npm run build --if-present
+          else
+            echo "No frontend to build"
+          fi

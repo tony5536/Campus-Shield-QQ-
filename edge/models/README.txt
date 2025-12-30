@@ -1,0 +1,1 @@
+Place heavy model artifacts here (yolo.pt, violence_model.h5). Do not commit large binaries to git.
