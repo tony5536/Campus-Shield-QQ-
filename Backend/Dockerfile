@@ -1,11 +1,12 @@
 # =========================
 # Multi-stage build: CampusShield AI FastAPI Backend
+# Production-ready for Railway deployment
 # =========================
 
 # ----------- Builder Stage -----------
 FROM python:3.13-slim AS builder
 
-WORKDIR /app
+WORKDIR /build
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -13,9 +14,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install dependencies globally
+# Copy only requirements for efficient caching
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Python dependencies globally in builder stage
+RUN pip install --no-cache-dir --no-warn-script-location \
+    -r requirements.txt
 
 # ----------- Final Stage -----------
 FROM python:3.13-slim
@@ -25,30 +29,37 @@ WORKDIR /app
 # Install runtime dependencies only
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Python dependencies from builder (global install)
+# Copy Python site-packages from builder to keep image lean
 COPY --from=builder /usr/local /usr/local
 
-# Copy application code
-COPY . .
+# Create non-root user with proper permissions (Railway-compatible)
+RUN useradd -m -u 1000 -s /bin/bash appuser && \
+    mkdir -p /app/data /app/logs && \
+    chown -R appuser:appuser /app /usr/local/lib && \
+    chmod -R 755 /usr/local/lib
 
-# Create non-root user for security
-RUN useradd -m -u 1000 appuser && \
-    mkdir -p /app/data && \
-    chown -R appuser:appuser /app
+# Copy application code and set proper ownership
+COPY --chown=appuser:appuser . .
+
+# Switch to non-root user for runtime
 USER appuser
 
-# Environment variables for production
+# Python environment variables for production
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
+    PORT=8000
 
-# Expose port
+# Expose port 8000 for local testing
 EXPOSE 8000
 
-# Optional health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health', timeout=5)"
+# Health check using curl (works without requests library)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Run the FastAPI app with 4 workers
-CMD ["uvicorn", "Backend.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# Railway-compatible CMD: respects $PORT environment variable
+# Uses 4 workers with uvicorn for production load handling
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 4"]
