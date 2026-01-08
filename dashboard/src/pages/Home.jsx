@@ -29,9 +29,9 @@ export default function Home() {
       const camerasRes = await api.getCameras();
       const cameras = camerasRes.data || [];
       
-      // Calculate stats
-      const activeIncidents = incidents.filter(i => i.status === 'active').length;
-      const closedIncidents = incidents.filter(i => i.status === 'closed').length;
+      // Calculate stats (normalize status values)
+      const activeIncidents = incidents.filter(i => (i.status ?? '').toString().toLowerCase() === 'active').length;
+      const closedIncidents = incidents.filter(i => (i.status ?? '').toString().toLowerCase() === 'closed').length;
       
       setStats({
         totalIncidents: incidents.length,
@@ -142,15 +142,24 @@ export default function Home() {
                     <td>{incident.title}</td>
                     <td>{incident.timestamp}</td>
                     <td>
-                      <span className={`badge ${incident.severity?.toLowerCase() || 'medium'}`}>
-                        {incident.severity === 'critical' || incident.severity === 'high' ? '🔴' : 
-                         incident.severity === 'medium' ? '🟠' : '🟢'} {incident.severity || 'Medium'}
-                      </span>
+                      {(() => {
+                        const sev = (incident?.severity ?? 'LOW').toString().toLowerCase();
+                        return (
+                          <span className={`badge ${sev || 'medium'}`}>
+                            {sev === 'critical' || sev === 'high' ? '🔴' : sev === 'medium' ? '🟠' : '🟢'} {incident.severity ?? 'Medium'}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td>
-                      <span className={`badge ${incident.status === 'active' ? 'active' : 'low'}`}>
-                        {incident.status}
-                      </span>
+                      {(() => {
+                        const statusLower = (incident?.status ?? 'ACTIVE').toString().toLowerCase();
+                        return (
+                          <span className={`badge ${statusLower === 'active' ? 'active' : 'low'}`}>
+                            {incident.status}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td>
                       <Link to={`/incident/${incident.id}`} className="btn btn-primary" style={{ fontSize: '12px', padding: '6px 12px' }}>

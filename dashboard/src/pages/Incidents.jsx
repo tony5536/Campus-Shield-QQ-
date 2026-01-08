@@ -81,11 +81,15 @@ export default function Incidents() {
     let filtered = incidents;
 
     if (filterStatus !== 'all') {
-      filtered = filtered.filter((i) => i.status === filterStatus);
+      filtered = filtered.filter((i) => (i.status ?? '').toString().toLowerCase() === filterStatus);
     }
 
     if (filterSeverity !== 'all') {
-      filtered = filtered.filter((i) => i.severity === filterSeverity);
+      filtered = filtered.filter((i) => {
+        const sev = (i.severity ?? 'LOW').toString().toLowerCase();
+        if (filterSeverity === 'critical') return sev === 'critical' || sev === 'high';
+        return sev === filterSeverity;
+      });
     }
 
     setFilteredIncidents(filtered);
@@ -177,15 +181,24 @@ export default function Incidents() {
                   <td>{incident.location}</td>
                   <td>{incident.timestamp}</td>
                   <td>
-                    <span className={`badge ${incident.severity?.toLowerCase() || 'medium'}`}>
-                      {incident.severity === 'critical' || incident.severity === 'high' ? '🔴' : 
-                       incident.severity === 'medium' ? '🟠' : '🟢'} {incident.severity || 'Medium'}
-                    </span>
+                    {(() => {
+                      const sev = (incident?.severity ?? 'LOW').toString().toLowerCase();
+                      return (
+                        <span className={`badge ${sev || 'medium'}`}>
+                          {sev === 'critical' || sev === 'high' ? '🔴' : sev === 'medium' ? '🟠' : '🟢'} {incident.severity ?? 'Medium'}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td>
-                    <span className={`badge ${incident.status === 'active' ? 'active' : 'low'}`}>
-                      {incident.status}
-                    </span>
+                    {(() => {
+                      const statusLower = (incident?.status ?? 'ACTIVE').toString().toLowerCase();
+                      return (
+                        <span className={`badge ${statusLower === 'active' ? 'active' : 'low'}`}>
+                          {incident.status}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td>{incident.assignedTo}</td>
                   <td>
@@ -215,21 +228,24 @@ export default function Incidents() {
         <div className="card danger">
           <div className="stat-label">Active Incidents</div>
           <div className="stat-number">
-            {filteredIncidents.filter((i) => i.status === 'active').length}
+            {filteredIncidents.filter((i) => (i.status ?? '').toString().toLowerCase() === 'active').length}
           </div>
         </div>
 
         <div className="card warning">
           <div className="stat-label">Critical Severity</div>
           <div className="stat-number">
-            {filteredIncidents.filter((i) => i.severity === 'critical').length}
+            {filteredIncidents.filter((i) => {
+              const sev = (i.severity ?? 'LOW').toString().toLowerCase();
+              return sev === 'critical' || sev === 'high';
+            }).length}
           </div>
         </div>
 
         <div className="card success">
           <div className="stat-label">Resolved</div>
           <div className="stat-number">
-            {filteredIncidents.filter((i) => i.status === 'resolved').length}
+            {filteredIncidents.filter((i) => (i.status ?? '').toString().toLowerCase() === 'resolved').length}
           </div>
         </div>
       </div>

@@ -96,13 +96,22 @@ export default function IncidentDetail() {
             <p style={{ color: '#7f8c8d', marginTop: '8px' }}>{incident.description}</p>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <span className={`badge ${incident.severity?.toLowerCase() || 'medium'}`} style={{ marginRight: '8px' }}>
-              {incident.severity === 'critical' || incident.severity === 'high' ? '🔴' : 
-               incident.severity === 'medium' ? '🟠' : '🟢'} {incident.severity || 'Medium'}
-            </span>
-            <span className={`badge ${incident.status === 'active' ? 'active' : 'low'}`}>
-              {incident.status}
-            </span>
+            {(() => {
+              const sev = (incident?.severity ?? 'LOW').toString().toLowerCase();
+              return (
+                <span className={`badge ${sev || 'medium'}`} style={{ marginRight: '8px' }}>
+                  {sev === 'critical' || sev === 'high' ? '🔴' : sev === 'medium' ? '🟠' : '🟢'} {incident.severity ?? 'Medium'}
+                </span>
+              );
+            })()}
+            {(() => {
+              const statusLower = (incident?.status ?? 'ACTIVE').toString().toLowerCase();
+              return (
+                <span className={`badge ${statusLower === 'active' ? 'active' : 'low'}`}>
+                  {incident.status}
+                </span>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -193,7 +202,7 @@ export default function IncidentDetail() {
       <div className="card">
         <h3>Actions</h3>
         <div style={{ marginTop: '16px' }}>
-          {incident.status === 'active' && (
+          {(incident?.status ?? 'ACTIVE').toString().toLowerCase() === 'active' && (
             <div style={{ marginBottom: '16px' }}>
               <label htmlFor="status-select" style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
                 Update Status:

@@ -10,6 +10,29 @@ python-multipart==0.0.20
 python-dotenv==1.2.1
 httpx==0.28.1  # For async HTTP requests (LLM API calls)
 
+# LLM & AI Integration
+langchain>=0.1.0  # Core LangChain
+langchain-openai>=0.1.0  # OpenAI integration (modern imports)
+langchain-community>=0.0.20  # Community integrations
+openai>=1.0.0  # OpenAI SDK
+
+# Vector Store & Embeddings
+faiss-cpu>=1.9.0  # Vector database for incident embeddings
+# Note: sentence-transformers may have numpy version conflicts
+# If you encounter issues, install separately: pip install sentence-transformers
+# sentence-transformers>=2.2.0  # For embeddings (commented due to numpy 2.x compatibility)
+numpy>=1.24.0  # Required for FAISS (numpy 2.x is fine)
+
+# Machine Learning
+scikit-learn>=1.4.0  # For ML models (RandomForest, GradientBoosting) - updated for Windows compatibility
+pandas>=2.0.0  # For data processing
+
+# Document Processing
+PyPDF2==3.0.1  # For PDF processing
+python-docx==1.1.0  # For DOCX processing
+
 # Production-specific (uncomment for production)
 # psycopg2-binary==2.9.10  # For PostgreSQL support
 # gunicorn==23.0.0  # Alternative to uvicorn workers
+# pinecone-client==3.2.0  # For Pinecone vector store (optional)
+# weaviate-client==4.1.1  # For Weaviate vector store (optional)

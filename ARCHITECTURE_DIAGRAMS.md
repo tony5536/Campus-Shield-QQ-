@@ -1,0 +1,517 @@
+# 📊 LLM Module - Visual Architecture & Flow Diagrams
+
+## System Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     CampusShield AI Frontend                     │
+│                  (React - LLMInsights Component)                 │
+│                                                                   │
+│  ┌──────────┬──────────┬────────┬─────────┬────────┬───────┐   │
+│  │   Chat   │Summarize │Reports │Anomaly  │History │Config  │   │
+│  └──────────┴──────────┴────────┴─────────┴────────┴───────┘   │
+└───────────────────────────┬────────────────────────────────────┘
+                            │
+                    (HTTP Requests via Axios)
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  FastAPI Backend (Port 8000)                     │
+│                   CampusShield AI Backend                        │
+│                                                                   │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │               API Routes (/api/llm/*)                    │   │
+│  │                                                            │   │
+│  │  • /health      • /chat         • /summarize              │   │
+│  │  • /report      • /explain-anomaly                        │   │
+│  │  • /history     • /config       • /models                 │   │
+│  └────────────────────┬─────────────────────────────────────┘   │
+│                       │                                           │
+│  ┌────────────────────▼─────────────────────────────────────┐   │
+│  │            LLM Service Layer                              │   │
+│  │    (app/services/advanced_llm_service.py)                │   │
+│  │                                                            │   │
+│  │    • LLMService (Orchestrator)                           │   │
+│  │    • Chain Manager                                       │   │
+│  └────────────────────┬─────────────────────────────────────┘   │
+│                       │                                           │
+│  ┌────────────────────▼─────────────────────────────────────┐   │
+│  │         Core LLM Components (ai/ directory)              │   │
+│  │                                                            │   │
+│  │  ┌──────────────────────────────────────────────────┐   │   │
+│  │  │ llm_utils.py - Core Logic                        │   │   │
+│  │  │ • LLMChainManager                                │   │   │
+│  │  │ • MultiTurnChat                                  │   │   │
+│  │  │ • IncidentSummarizer                             │   │   │
+│  │  │ • ReportGenerator                                │   │   │
+│  │  │ • AnomalyExplainer                               │   │   │
+│  │  └──────────────────────────────────────────────────┘   │   │
+│  │                                                            │   │
+│  │  ┌──────────────────────────────────────────────────┐   │   │
+│  │  │ prompts.py - Prompt Templates                    │   │   │
+│  │  │ • System prompts                                 │   │   │
+│  │  │ • Chat templates                                 │   │   │
+│  │  │ • Summarization templates                        │   │   │
+│  │  │ • Report templates                               │   │   │
+│  │  │ • Anomaly templates                              │   │   │
+│  │  └──────────────────────────────────────────────────┘   │   │
+│  │                                                            │   │
+│  │  ┌──────────────────────────────────────────────────┐   │   │
+│  │  │ vector_store.py - Vector Database                │   │   │
+│  │  │ • FAISSVectorStore (Primary)                      │   │   │
+│  │  │ • MemoryVectorStore (Dev)                         │   │   │
+│  │  │ • PineconeVectorStore (Future)                    │   │   │
+│  │  └──────────────────────────────────────────────────┘   │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+                            │
+                ┌───────────┴───────────┐
+                │                       │
+                ▼                       ▼
+        ┌──────────────────┐   ┌──────────────────┐
+        │  OpenAI GPT API  │   │  Vector Database │
+        │  (gpt-4, etc)    │   │  (FAISS/Pinecone)│
+        └──────────────────┘   └──────────────────┘
+```
+
+---
+
+## Data Flow Diagrams
+
+### 1. Chat Flow
+
+```
+User Input
+    │
+    ▼
+┌─────────────────────────────┐
+│ Chat Request Handler        │
+│ - Validate input            │
+│ - Get conversation ID       │
+└────────────┬────────────────┘
+             │
+             ▼
+┌─────────────────────────────┐
+│ Retrieve Context            │
+│ - Query vector store        │
+│ - Get similar incidents     │
+└────────────┬────────────────┘
+             │
+             ▼
+┌─────────────────────────────┐
+│ Format Prompt               │
+│ - Add chat history          │
+│ - Add context               │
+│ - Add user input            │
+└────────────┬────────────────┘
+             │
+             ▼
+┌─────────────────────────────┐
+│ Call LLM Chain              │
+│ - Execute chain             │
+│ - Get response              │
+└────────────┬────────────────┘
+             │
+             ▼
+┌─────────────────────────────┐
+│ Update History              │
+│ - Add assistant message     │
+│ - Update memory             │
+└────────────┬────────────────┘
+             │
+             ▼
+         Response
+    (Chat + History)
+```
+
+### 2. Report Generation Flow
+
+```
+User Request
+    │
+    ▼
+┌─────────────────────────────┐
+│ Fetch Incidents             │
+│ - Query database            │
+│ - Filter by date range      │
+└────────────┬────────────────┘
+             │
+             ▼
+┌─────────────────────────────┐
+│ Calculate Statistics        │
+│ - Severity breakdown        │
+│ - Location hotspots         │
+│ - Incident trends           │
+└────────────┬────────────────┘
+             │
+             ▼
+┌─────────────────────────────┐
+│ Format Report Data          │
+│ - Prepare summaries         │
+│ - Organize metrics          │
+└────────────┬────────────────┘
+             │
+             ▼
+┌─────────────────────────────┐
+│ Call Report Generator       │
+│ - Use LangChain chain       │
+│ - Apply template            │
+│ - Get LLM output            │
+└────────────┬────────────────┘
+             │
+             ▼
+       Professional Report
+```
+
+### 3. Anomaly Explanation Flow
+
+```
+Anomaly Detection Event
+    │
+    ▼
+┌─────────────────────────────┐
+│ Receive Anomaly Data        │
+│ - Score                     │
+│ - Type                      │
+│ - Location                  │
+│ - Threshold                 │
+└────────────┬────────────────┘
+             │
+             ▼
+┌─────────────────────────────┐
+│ Search Historical Data      │
+│ - Query vector store        │
+│ - Find similar incidents    │
+└────────────┬────────────────┘
+             │
+             ▼
+┌─────────────────────────────┐
+│ Build Context               │
+│ - Historical incidents      │
+│ - Anomaly metrics           │
+│ - Comparison data           │
+└────────────┬────────────────┘
+             │
+             ▼
+┌─────────────────────────────┐
+│ Call Anomaly Explainer      │
+│ - Run analysis chain        │
+│ - Get explanation           │
+│ - Assess risk               │
+└────────────┬────────────────┘
+             │
+             ▼
+    ┌────────────────────────────┐
+    │ Generate Recommendations   │
+    │ - Based on analysis        │
+    │ - Context-specific         │
+    └────────┬───────────────────┘
+             │
+             ▼
+    Explanation + Risk + Actions
+```
+
+---
+
+## Component Interaction Diagram
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                      LLMService                                   │
+│                    (Orchestrator)                                 │
+│                                                                    │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ chat: MultiTurnChat                                      │   │
+│  │ ├─ Uses: LLMChainManager                                 │   │
+│  │ ├─ Uses: VectorStore                                     │   │
+│  │ └─ Maintains: Conversation history & memory              │   │
+│  │                                                            │   │
+│  ├─ sendMessage()                                            │   │
+│  ├─ getHistory()                                             │   │
+│  └─ clearHistory()                                           │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                    │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ summarizer: IncidentSummarizer                           │   │
+│  │ ├─ Uses: LLMChainManager                                 │   │
+│  │ └─ Provides: summarize_incidents()                       │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                    │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ reporter: ReportGenerator                                │   │
+│  │ ├─ Uses: LLMChainManager                                 │   │
+│  │ ├─ generate_daily_report()                               │   │
+│  │ └─ generate_weekly_report()                              │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                    │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ explainer: AnomalyExplainer                              │   │
+│  │ ├─ Uses: LLMChainManager                                 │   │
+│  │ ├─ Uses: VectorStore                                     │   │
+│  │ ├─ explain_anomaly()                                     │   │
+│  │ └─ analyze_pattern()                                     │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────┘
+         │                          │                 │
+         ▼                          ▼                 ▼
+┌──────────────────┐    ┌──────────────────┐   ┌────────────────┐
+│ LLMChainManager  │    │ VectorStore      │   │ PromptTemplate │
+│                  │    │ (FAISS)          │   │                │
+│ • Manages chains │    │ • Embeddings     │   │ • System       │
+│ • Manages memory │    │ • Storage        │   │ • Chat         │
+│ • Caches chains  │    │ • Retrieval      │   │ • Report       │
+│ • Config control │    │ • Similarity     │   │ • Anomaly      │
+└──────────────────┘    └──────────────────┘   └────────────────┘
+         │                      │
+         └──────────┬───────────┘
+                    │
+                    ▼
+            ┌──────────────────┐
+            │  OpenAI API      │
+            │  GPT-4, etc      │
+            └──────────────────┘
+```
+
+---
+
+## Database Integration
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│            Existing CampusShield Database                   │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ incidents table                                      │  │
+│  │ • id, type, location, severity, timestamp, etc      │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ cameras table, alerts table, etc                    │  │
+│  └──────────────────────────────────────────────────────┘  │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+            (Query & ETL Pipeline)
+                       │
+                       ▼
+        ┌──────────────────────────────┐
+        │  Vector Store (FAISS)        │
+        │  • Embeddings of incidents   │
+        │  • Cached on disk            │
+        │  • Fast semantic search      │
+        └──────────────────────────────┘
+                       │
+                       ▼
+        ┌──────────────────────────────┐
+        │  LLM Service                 │
+        │  • Retrieves similar items   │
+        │  • Uses for context          │
+        │  • Enhances responses        │
+        └──────────────────────────────┘
+```
+
+---
+
+## Request/Response Cycle
+
+```
+Frontend (React)
+    │
+    ├─ POST /api/llm/chat
+    │  │  {"user_input": "...", "conversation_id": "..."}
+    │  │
+    │  └──► Backend Route Handler (llm.py)
+    │       │
+    │       ├─ Validate request
+    │       ├─ Get LLM service
+    │       └─ Call service.chat.chat()
+    │           │
+    │           ├─ Retrieve context (vector store)
+    │           ├─ Format prompt
+    │           ├─ Call LLM chain
+    │           ├─ Update history
+    │           └─ Return response
+    │
+    └◄──── Response
+           {
+             "response": "...",
+             "conversation_id": "...",
+             "chat_history": [...]
+           }
+```
+
+---
+
+## Technology Stack Visualization
+
+```
+                    ┌─────────────────┐
+                    │   User Browser  │
+                    │   (JavaScript)  │
+                    └────────┬────────┘
+                             │
+                    ┌────────▼────────┐
+                    │   React App     │
+                    │  (LLMInsights)  │
+                    └────────┬────────┘
+                             │
+                    ┌────────▼────────┐
+                    │  Axios HTTP     │
+                    └────────┬────────┘
+                             │
+         ┌───────────────────┴───────────────────┐
+         │                                       │
+    ┌────▼──────┐                      ┌────────▼─────┐
+    │ FastAPI   │                      │   Pydantic   │
+    │ (Routes)  │                      │ (Validation) │
+    └────┬──────┘                      └──────────────┘
+         │
+    ┌────▼──────────────────┐
+    │  Python Microservices │
+    │                       │
+    │  ┌────────────────┐   │
+    │  │  LangChain     │   │
+    │  │  Orchestration │   │
+    │  └────────────────┘   │
+    │                       │
+    │  ┌────────────────┐   │
+    │  │  Vector Store  │   │
+    │  │  (FAISS)       │   │
+    │  └────────────────┘   │
+    │                       │
+    │  ┌────────────────┐   │
+    │  │  Prompt Mgmt   │   │
+    │  └────────────────┘   │
+    └────┬──────────────────┘
+         │
+    ┌────▼──────────────────────────────────┐
+    │         External Services             │
+    │                                       │
+    │  ┌────────────────┐                   │
+    │  │  OpenAI API    │                   │
+    │  │  (GPT Models)  │                   │
+    │  └────────────────┘                   │
+    │                                       │
+    │  ┌────────────────┐                   │
+    │  │  Database      │                   │
+    │  │  (SQLAlchemy)  │                   │
+    │  └────────────────┘                   │
+    └───────────────────────────────────────┘
+```
+
+---
+
+## File Dependency Graph
+
+```
+Frontend Requests
+       │
+       ▼
+   llm.py (routes)
+       │
+       ├─► advanced_llm_service.py
+       │        │
+       │        └─► llm_utils.py
+       │              │
+       │              ├─► prompts.py (templates)
+       │              │
+       │              ├─► vector_store.py
+       │              │    └─► FAISS / Memory
+       │              │
+       │              └─► LangChain
+       │                   └─► OpenAI API
+       │
+       └─► vector_store_service.py
+                │
+                └─► vector_store.py
+```
+
+---
+
+## Deployment Architecture
+
+```
+┌──────────────────────────────────────────────────────┐
+│          Cloud Platform (Render/Railway)             │
+│                                                      │
+│  ┌──────────────────────────────────────────────┐  │
+│  │           Docker Container                  │  │
+│  │                                              │  │
+│  │  ┌────────────────────────────────────────┐ │  │
+│  │  │  FastAPI Server (Port 8000)            │ │  │
+│  │  │  • LLM Routes                          │ │  │
+│  │  │  • API Handlers                        │ │  │
+│  │  └────────────────────────────────────────┘ │  │
+│  │                                              │  │
+│  │  ┌────────────────────────────────────────┐ │  │
+│  │  │  Python Environment                    │ │  │
+│  │  │  • LangChain                           │ │  │
+│  │  │  • FAISS                               │ │  │
+│  │  │  • OpenAI SDK                          │ │  │
+│  │  └────────────────────────────────────────┘ │  │
+│  │                                              │  │
+│  │  ┌────────────────────────────────────────┐ │  │
+│  │  │  Persistent Volume                     │ │  │
+│  │  │  • FAISS index files                   │ │  │
+│  │  │  • Logs                                │ │  │
+│  │  └────────────────────────────────────────┘ │  │
+│  └──────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────┘
+         │                    │                   │
+         ▼                    ▼                   ▼
+    Environment         External APIs        Database
+    Variables         • OpenAI GPT-4         Connection
+    (API Keys)        • Embeddings API
+```
+
+---
+
+## Performance Metrics Flow
+
+```
+Request Received
+       │
+       ├─ Timestamp: Start
+       │
+       ├─► Validation: < 1ms
+       ├─► Vector Search: 10-50ms (FAISS cached)
+       ├─► Prompt Format: 1-5ms
+       ├─► LLM Call: 1-5s (Network + Processing)
+       ├─► Response Format: 1-2ms
+       │
+       └─ Timestamp: End
+              │
+              ├─ Total Latency: ~1.5-5.5s
+              ├─ Bottleneck: LLM API call
+              │
+              └─ Optimization Tips:
+                  • Use gpt-3.5-turbo for speed
+                  • Cache frequent queries
+                  • Reduce max_tokens
+```
+
+---
+
+## Error Handling Flow
+
+```
+Request
+    │
+    ▼
+Validation
+    │
+    ├─ Valid ──┬────► Process ──► Success
+    │          │
+    │          └─► LLM Error ──► Log + Fallback Response
+    │
+    └─ Invalid ──► Pydantic Error ──► 422 Response
+                       │
+                       ├─ Schema Error
+                       ├─ Type Error
+                       └─ Range Error
+```
+
+---
+
+These diagrams show how all components work together harmoniously! 🎨
+
+For implementation details, refer to the code snippets and API documentation.

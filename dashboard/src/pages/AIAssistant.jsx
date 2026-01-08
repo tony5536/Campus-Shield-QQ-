@@ -21,7 +21,7 @@ export default function AIAssistant() {
   };
 
   const getSeverityClass = (severity) => {
-    const sev = severity?.toLowerCase() || 'medium';
+    const sev = (severity ?? 'LOW').toString().toLowerCase();
     if (sev === 'high') return 'high';
     if (sev === 'medium') return 'medium';
     if (sev === 'low') return 'low';
@@ -29,7 +29,7 @@ export default function AIAssistant() {
   };
 
   const getSeverityEmoji = (severity) => {
-    const sev = severity?.toLowerCase() || 'medium';
+    const sev = (severity ?? 'LOW').toString().toLowerCase();
     if (sev === 'high') return '🔴';
     if (sev === 'medium') return '🟠';
     if (sev === 'low') return '🟢';
@@ -157,13 +157,13 @@ export default function AIAssistant() {
         <div className="card" style={{ 
           marginBottom: '24px', 
           borderLeft: `5px solid ${
-            lastAnalysis.severity?.toLowerCase() === 'high' ? '#e74c3c' :
-            lastAnalysis.severity?.toLowerCase() === 'medium' ? '#f39c12' : '#27ae60'
+            (lastAnalysis?.severity ?? 'LOW').toString().toLowerCase() === 'high' ? '#e74c3c' :
+            (lastAnalysis?.severity ?? 'LOW').toString().toLowerCase() === 'medium' ? '#f39c12' : '#27ae60'
           }`
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
             <span className={`severity-badge ${getSeverityClass(lastAnalysis.severity)}`}>
-              {getSeverityEmoji(lastAnalysis.severity)} {lastAnalysis.severity || 'Medium'}
+              {getSeverityEmoji(lastAnalysis.severity)} {(lastAnalysis?.severity ?? 'Medium')}
             </span>
             <span style={{ color: '#7f8c8d', fontSize: '14px' }}>
               Confidence: {lastAnalysis.confidence || 'N/A'}
@@ -175,13 +175,13 @@ export default function AIAssistant() {
             <p style={{ color: '#34495e', lineHeight: '1.6' }}>{lastAnalysis.summary}</p>
           </div>
           
-          <div style={{ 
+            <div style={{ 
             padding: '16px', 
             backgroundColor: '#f8f9fa', 
             borderRadius: '8px',
             borderLeft: `4px solid ${
-              lastAnalysis.severity?.toLowerCase() === 'high' ? '#e74c3c' :
-              lastAnalysis.severity?.toLowerCase() === 'medium' ? '#f39c12' : '#27ae60'
+              (lastAnalysis?.severity ?? 'LOW').toString().toLowerCase() === 'high' ? '#e74c3c' :
+              (lastAnalysis?.severity ?? 'LOW').toString().toLowerCase() === 'medium' ? '#f39c12' : '#27ae60'
             }`
           }}>
             <h4 style={{ color: '#2c3e50', marginBottom: '8px' }}>💡 Recommended Action</h4>
