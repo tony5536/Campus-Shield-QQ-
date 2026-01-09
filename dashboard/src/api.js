@@ -2,9 +2,16 @@
 import axios from 'axios';
 import { API_ENDPOINTS } from './config';
 
+// Load backend URL from environment variable (VITE or REACT_APP)
+const BACKEND_URL = process.env.VITE_API_BASE_URL || process.env.REACT_APP_BACKEND_URL || '';
+const API_TIMEOUT = parseInt(process.env.VITE_API_TIMEOUT || process.env.REACT_APP_API_TIMEOUT || '30000', 10);
+
+// Log configuration on startup
+console.log(`[API] Backend URL: ${BACKEND_URL}, Timeout: ${API_TIMEOUT}ms`);
+
 const client = axios.create({
-  baseURL: API_ENDPOINTS.HEALTH.replace('/health', ''),
-  timeout: 10000,
+  baseURL: `${BACKEND_URL.replace(/\\$/, '')}/api`,
+  timeout: API_TIMEOUT,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -98,52 +105,57 @@ client.interceptors.response.use(
 
 // API Methods
 export const api = {
+  // Expose client for direct use
+  client: client,
+
   // Health
-  checkHealth: () => client.get('/health'),
-  
+  checkHealth: () => axios.get(`${BACKEND_URL.replace(/\/$/, '')}/health`),
+
   // Auth
   login: (username, password) =>
-    client.post('/api/auth/login', { username, password }),
-  
+    client.post('/auth/login', { username, password }),
+
   // Cameras
-  getCameras: () => client.get('/api/cameras'),
-  getCamera: (id) => client.get(`/api/cameras/${id}`),
-  createCamera: (data) => client.post('/api/cameras', data),
-  
+  getCameras: () => client.get('/cameras'),
+  getCamera: (id) => client.get(`/cameras/${id}`),
+  createCamera: (data) => client.post('/cameras', data),
+
   // Incidents
   getIncidents: () =>
-    client.get('/api/incidents').then((res) => {
+    client.get('/incidents').then((res) => {
       // sanitize list
       if (Array.isArray(res.data)) {
-        res.data = res.data.map(sanitizeIncident);
+        // If API returns wrapper { incidents: [...] }, normalize
+        const list = Array.isArray(res.data) ? res.data : (res.data.incidents || []);
+        res.data = list.map(sanitizeIncident);
       }
       return res;
     }),
   getIncident: (id) =>
-    client.get(`/api/incidents/${id}`).then((res) => {
+    client.get(`/incidents/${id}`).then((res) => {
       res.data = sanitizeIncident(res.data || {});
       return res;
     }),
-  createIncident: (data) => client.post('/api/incidents', data),
-  
+  createIncident: (data) => client.post('/incidents', data),
+
   // Alerts
-  getAlerts: () => client.get('/api/alerts'),
+  getAlerts: () => client.get('/alerts'),
   acknowledgeAlert: (id, actor = 'guard') =>
-    client.post(`/api/alerts/${id}/ack`, {}, { params: { actor } }),
-  
+    client.post(`/alerts/${id}/ack`, {}, { params: { actor } }),
+
   // AI
   explainIncident: (incidentId) =>
-    client.post('/api/ai/explain-incident', { incident_id: incidentId }),
+    client.post('/ai/explain-incident', { incident_id: incidentId }),
   generateReport: (incidentId, includeRecommendations = true) =>
-    client.post('/api/ai/generate-report', {
+    client.post('/ai/generate-report', {
       incident_id: incidentId,
       include_recommendations: includeRecommendations,
     }),
   assistantQuery: (query, context = null) =>
-    client.post('/api/ai/assistant', { query, context }),
+    client.post('/ai/assistant', { query, context }),
   aiAssist: (query) =>
-    client.post('/api/ai/assist', { query }),
-  getAssistantStats: () => client.get('/api/ai/assistant/stats'),
+    client.post('/ai/assist', { query }),
+  getAssistantStats: () => client.get('/ai/assistant/stats'),
 };
 
 export default api;

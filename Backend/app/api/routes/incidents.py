@@ -87,6 +87,33 @@ def _incident_to_dict(inc: Incident) -> dict:
 
 router = APIRouter()
 
+@router.get('/recent')
+def recent_incidents(limit: int = 10, db: Session = Depends(get_db)):
+    """
+    GET /api/incidents/recent
+    Returns recent incidents in simplified shape required by frontend.
+    """
+    logger = logging.getLogger(__name__)
+    logger.info("Route hit: GET /api/incidents/recent")
+    try:
+        rows = db.query(Incident).order_by(Incident.timestamp.desc()).limit(limit).all()
+        out = []
+        for r in rows:
+            d = _incident_to_dict(r)
+            title = d.get('incident_type') or d.get('description') or f"Incident {d.get('id')}"
+            out.append({
+                'id': d.get('id'),
+                'title': title,
+                'timestamp': d.get('timestamp'),
+                'severity': d.get('severity'),
+                'status': d.get('status'),
+            })
+        logger.info("Response /api/incidents/recent: %s", out)
+        return { 'incidents': out }
+    except Exception as e:
+        logger.exception("Error in GET /api/incidents/recent")
+        raise HTTPException(status_code=500, detail=str(e))
+
 class IncidentIn(BaseModel):
     camera_id: int | None = None
     incident_type: str

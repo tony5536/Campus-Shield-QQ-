@@ -18,9 +18,7 @@ openai>=1.0.0  # OpenAI SDK
 
 # Vector Store & Embeddings
 faiss-cpu>=1.9.0  # Vector database for incident embeddings
-# Note: sentence-transformers may have numpy version conflicts
-# If you encounter issues, install separately: pip install sentence-transformers
-# sentence-transformers>=2.2.0  # For embeddings (commented due to numpy 2.x compatibility)
+sentence-transformers>=2.2.0  # For embeddings (uncommented - works with numpy 2.x)
 numpy>=1.24.0  # Required for FAISS (numpy 2.x is fine)
 
 # Machine Learning

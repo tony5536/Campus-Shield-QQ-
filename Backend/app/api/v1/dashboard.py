@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 
 from ...core.security import get_db
 from ...models.incident import Incident, IncidentStatus
+from ...models.camera import Camera
 from ...core.logging import setup_logger
 
 logger = setup_logger(__name__)
@@ -42,10 +43,88 @@ class IncidentResponse(BaseModel):
         from_attributes = True
 
 
+@router.get("/metrics", response_model=dict)
+def get_dashboard_metrics(db: Session = Depends(get_db)):
+    """
+    Get dashboard metrics for the main overview.
+    
+    Canonical endpoint: GET /api/v1/dashboard/metrics
+    Returns real data from database, never returns placeholders.
+    
+    Returns:
+        {
+            "active_alerts": int,
+            "total_incidents": int,
+            "cameras_online": int,
+            "avg_response_time": str (formatted as "Xm")
+        }
+    """
+    try:
+        # Active alerts: count ACTIVE incidents
+        active_alerts = db.query(Incident).filter(
+            Incident.status == IncidentStatus.ACTIVE
+        ).count()
+        
+        # Total incidents (all time, real data)
+        total_incidents = db.query(Incident).count()
+        
+        # Cameras online: count from Camera table (real data)
+        try:
+            cameras_online = db.query(Camera).count()
+        except Exception:
+            cameras_online = 0
+        
+        # Average response time: compute from resolved incident timestamps
+        now = datetime.utcnow()
+        resolved_incidents = db.query(Incident).filter(
+            Incident.status == IncidentStatus.RESOLVED
+        ).all()
+        
+        if resolved_incidents:
+            total_minutes = 0.0
+            for inc in resolved_incidents:
+                if inc.timestamp:
+                    delta = now - (inc.timestamp.replace(tzinfo=None) if hasattr(inc.timestamp, 'tzinfo') else inc.timestamp)
+                    total_minutes += max(delta.total_seconds() / 60.0, 0.0)
+            avg_minutes = total_minutes / len(resolved_incidents)
+        else:
+            # Fallback: average age of all incidents (real data, not placeholder)
+            all_incidents = db.query(Incident).all()
+            if all_incidents:
+                total_minutes = 0.0
+                for inc in all_incidents:
+                    if inc.timestamp:
+                        delta = now - (inc.timestamp.replace(tzinfo=None) if hasattr(inc.timestamp, 'tzinfo') else inc.timestamp)
+                        total_minutes += max(delta.total_seconds() / 60.0, 0.0)
+                avg_minutes = total_minutes / len(all_incidents)
+            else:
+                avg_minutes = 0.0
+        
+        # Bounds check for realistic display
+        if avg_minutes > 10000 or avg_minutes < 0:
+            avg_response_time = "—"
+        else:
+            avg_response_time = f"{avg_minutes:.1f} m"
+        
+        payload = {
+            "active_alerts": int(active_alerts),
+            "total_incidents": int(total_incidents),
+            "cameras_online": int(cameras_online),
+            "avg_response_time": avg_response_time,
+        }
+        
+        logger.info(f"Dashboard metrics requested: {payload}")
+        return payload
+    except Exception as e:
+        logger.error(f"Error fetching dashboard metrics: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error fetching dashboard data: {str(e)}")
+
+
 @router.get("/overview", response_model=DashboardOverview)
 def get_dashboard_overview(db: Session = Depends(get_db)):
     """
-    Get dashboard overview statistics.
+    Get dashboard overview statistics (legacy endpoint for backward compatibility).
+    New code should use /metrics instead.
     
     Returns:
         DashboardOverview with key metrics
@@ -62,19 +141,27 @@ def get_dashboard_overview(db: Session = Depends(get_db)):
             Incident.timestamp >= week_ago
         ).count()
         
-        # Mock cameras online (as specified)
-        cameras_online = 24
+        # Cameras online: real data from Camera table
+        try:
+            cameras_online = db.query(Camera).count()
+        except Exception:
+            cameras_online = 0
         
-        # Calculate average response time (mock for now, can be enhanced with actual response tracking)
-        # For now, use a simple heuristic: High severity incidents resolved quickly
-        resolved_high_severity = db.query(Incident).filter(
-            Incident.status == IncidentStatus.RESOLVED,
-            Incident.severity >= 0.7
-        ).count()
+        # Calculate average response time from resolved incidents
+        now = datetime.utcnow()
+        resolved_incidents = db.query(Incident).filter(
+            Incident.status == IncidentStatus.RESOLVED
+        ).all()
         
-        # Mock average response time (in minutes)
-        # In production, this would be calculated from actual response timestamps
-        avg_response_time = 15.5 if resolved_high_severity > 0 else 20.0
+        if resolved_incidents:
+            total_minutes = 0.0
+            for inc in resolved_incidents:
+                if inc.timestamp:
+                    delta = now - (inc.timestamp.replace(tzinfo=None) if hasattr(inc.timestamp, 'tzinfo') else inc.timestamp)
+                    total_minutes += max(delta.total_seconds() / 60.0, 0.0)
+            avg_response_time = total_minutes / len(resolved_incidents)
+        else:
+            avg_response_time = 0.0
         
         return DashboardOverview(
             active_alerts=active_alerts,

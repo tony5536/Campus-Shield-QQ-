@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # SEVERITY LEVELS - STRICT ENUM
 # ============================================================================
-SEVERITY_ENUM = Literal["low", "medium", "high"]
+SEVERITY_ENUM = Literal["LOW", "MEDIUM", "HIGH"]
 
 def normalize_severity(value: Optional[str]) -> SEVERITY_ENUM:
     """
@@ -28,30 +28,34 @@ def normalize_severity(value: Optional[str]) -> SEVERITY_ENUM:
     if value is None:
         return "low"
     
-    normalized = str(value).strip().lower()
+    normalized = str(value).strip().upper()
     
     # Map common aliases
-    if normalized in ("critical", "urgent", "emergency"):
-        return "high"
-    if normalized in ("med", "moderate", "warning"):
-        return "medium"
-    if normalized in ("low", "minor", "info"):
-        return "low"
+    if normalized in ("CRITICAL", "URGENT", "EMERGENCY"):
+        return "HIGH"
+    if normalized in ("MED", "MODERATE", "WARNING"):
+        return "MEDIUM"
+    if normalized in ("LOW", "MINOR", "INFO"):
+        return "LOW"
     
     # Try numeric interpretation (0-1 scale)
     try:
         num = float(normalized)
         if num >= 0.66:
-            return "high"
+            return "HIGH"
         if num >= 0.33:
-            return "medium"
-        return "low"
+            return "MEDIUM"
+        return "LOW"
     except (ValueError, TypeError):
+        # Already normalized uppercase check
+        if normalized in ("LOW", "MEDIUM", "HIGH"):
+            return normalized
+            
         logger.warning(
             f"Invalid severity value '{value}' (type={type(value).__name__}). "
-            f"Expected one of: low, medium, high. Defaulting to 'low'."
+            f"Expected one of: LOW, MEDIUM, HIGH. Defaulting to 'LOW'."
         )
-        return "low"
+        return "LOW"
 
 
 # ============================================================================
@@ -83,8 +87,8 @@ class IncidentBase(BaseModel):
         description="Detection source (camera_id, sensor_id, user_report, etc)"
     )
     severity: SEVERITY_ENUM = Field(
-        default="low",
-        description="Severity level: low | medium | high"
+        default="LOW",
+        description="Severity level: LOW | MEDIUM | HIGH"
     )
     description: Optional[str] = Field(
         None,

@@ -9,15 +9,21 @@ from typing import List, Optional
 import os
 from dotenv import load_dotenv
 
+# BASE_DIR points to Backend folder, PROJ_ROOT points to project root
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+PROJ_ROOT = BASE_DIR.parent
 
-# Load .env file from Backend directory
-ENV_FILE = BASE_DIR / ".env"
-if ENV_FILE.exists():
-    load_dotenv(ENV_FILE)
-else:
-    # Try loading from project root as fallback
-    load_dotenv(BASE_DIR.parent / ".env")
+# Load .env from PROJECT ROOT FIRST (highest priority)
+ROOT_ENV_FILE = PROJ_ROOT / ".env"
+BACKEND_ENV_FILE = BASE_DIR / ".env"
+
+if ROOT_ENV_FILE.exists():
+    load_dotenv(ROOT_ENV_FILE)
+elif BACKEND_ENV_FILE.exists():
+    load_dotenv(BACKEND_ENV_FILE)
+
+# Determine which .env file to use for pydantic
+ENV_FILE = ROOT_ENV_FILE if ROOT_ENV_FILE.exists() else (BACKEND_ENV_FILE if BACKEND_ENV_FILE.exists() else None)
 
 
 class Settings(BaseSettings):
@@ -75,6 +81,11 @@ class Settings(BaseSettings):
     embedding_model: str = Field(default="sentence-transformers/all-MiniLM-L6-v2", env="EMBEDDING_MODEL")
     vector_store_path: str = Field(default="./vector_store", env="VECTOR_STORE_PATH")
     
+    # Feature Flags
+    enable_llm: bool = Field(default=True, env="ENABLE_LLM")
+    enable_rag: bool = Field(default=False, env="ENABLE_RAG")
+    enable_websocket: bool = Field(default=True, env="ENABLE_WEBSOCKET")
+    
     # Pinecone (optional)
     pinecone_api_key: Optional[str] = Field(default=None, env="PINECONE_API_KEY")
     pinecone_environment: Optional[str] = Field(default=None, env="PINECONE_ENVIRONMENT")
@@ -93,6 +104,16 @@ class Settings(BaseSettings):
 
     # Logging
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
+    log_file: Optional[str] = Field(default=None, env="LOG_FILE")
+
+    # Video Streaming (Demo Feature)
+    enable_video_stream: bool = Field(default=True, env="ENABLE_VIDEO_STREAM")
+    video_stream_fps: int = Field(default=30, env="VIDEO_STREAM_FPS")
+    video_stream_resolution: str = Field(default="1280x720", env="VIDEO_STREAM_RESOLUTION")
+
+    # Backend URL (for external access)
+    backend_url: str = Field(default="http://localhost:8000", env="BACKEND_URL")
+    frontend_url: str = Field(default="http://localhost:3000", env="FRONTEND_URL")
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -126,6 +147,36 @@ class Settings(BaseSettings):
             return v.strip().lower() in truthy
 
         return bool(v)
+
+    def validate_startup(self) -> dict[str, bool]:
+        """
+        Validate all critical settings on startup.
+        Returns dict of check results for logging.
+        """
+        checks = {}
+
+        # Database check
+        checks["database"] = bool(self.database_url)
+
+        # LLM check
+        if self.enable_llm:
+            checks["llm_provider"] = bool(self.llm_provider)
+            if self.llm_provider == "openai":
+                checks["openai_api_key"] = bool(self.openai_api_key)
+            checks["llm_model"] = bool(self.openai_model)
+        else:
+            checks["llm_disabled"] = True
+
+        # Vector store check
+        if self.enable_rag:
+            checks["vector_store"] = bool(self.vector_store_type)
+        else:
+            checks["rag_disabled"] = True
+
+        # CORS check
+        checks["cors"] = len(self.cors_origins) > 0
+
+        return checks
 
     @property
     def is_production(self) -> bool:

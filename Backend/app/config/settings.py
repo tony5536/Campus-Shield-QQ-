@@ -53,11 +53,19 @@ class Settings(BaseSettings):
     # Server
     host: str = Field(default="0.0.0.0", env="HOST")
     port: int = Field(default=8000, env="PORT")
+    backend_url: str = Field(default="http://127.0.0.1:8000", env="BACKEND_URL")
+
+    # Service URLs
+    rag_base_url: str = Field(default="http://127.0.0.1:8001", env="RAG_BASE_URL")
+    rag_service_url: str = Field(default="http://127.0.0.1:8001", env="RAG_SERVICE_URL")
+    dashboard_url: str = Field(default="http://localhost:5173", env="DASHBOARD_URL")
 
     # LLM Configuration
     llm_provider: str = Field(default="openai", env="LLM_PROVIDER")
     openai_api_key: Optional[str] = Field(default=None, env="OPENAI_API_KEY") 
     openai_model: str = Field(default="gpt-4o-mini", env="OPENAI_MODEL")
+    groq_api_key: Optional[str] = Field(default=None, env="GROQ_API_KEY")
+    gemini_api_key: Optional[str] = Field(default=None, env="GEMINI_API_KEY")
     llm_temperature: float = Field(default=0.7, ge=0.0, le=2.0, env="LLM_TEMPERATURE")
     llm_max_tokens: int = Field(default=1024, ge=256, le=4096, env="LLM_MAX_TOKENS")
     llm_timeout: int = Field(default=30, env="LLM_TIMEOUT")

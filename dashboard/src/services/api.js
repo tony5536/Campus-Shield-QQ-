@@ -5,9 +5,18 @@
 
 import axios from 'axios';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
-const REQUEST_TIMEOUT = 30000; // 30 seconds
+// Load API configuration from environment variables
+// REACT_APP_* variables are injected by react-scripts from .env file
+const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || '';
+const API_PATH = '/api';
+const API_BASE = `${API_BASE_URL.replace(/\/$/, '')}${API_PATH}`;
+const REQUEST_TIMEOUT = parseInt(process.env.REACT_APP_API_TIMEOUT || '30000', 10);
 const MAX_RETRIES = 3;
+
+// Log API configuration on module load (only in development)
+if (process.env.REACT_APP_ENV === 'development') {
+  console.log(`[API] Initialized with base URL: ${API_BASE}`);
+}
 
 // Create axios instance
 const apiClient = axios.create({
@@ -53,18 +62,18 @@ apiClient.interceptors.response.use(
  */
 async function withRetry(fn, maxRetries = MAX_RETRIES) {
   let lastError;
-  
+
   for (let i = 0; i < maxRetries; i++) {
     try {
       return await fn();
     } catch (error) {
       lastError = error;
-      
+
       // Don't retry on client errors (4xx)
       if (error.response?.status >= 400 && error.response?.status < 500) {
         throw error;
       }
-      
+
       // Exponential backoff
       if (i < maxRetries - 1) {
         const delay = Math.pow(2, i) * 1000; // 1s, 2s, 4s
@@ -73,7 +82,7 @@ async function withRetry(fn, maxRetries = MAX_RETRIES) {
       }
     }
   }
-  
+
   throw lastError;
 }
 
@@ -136,11 +145,11 @@ export const incidentsAPI = {
   async list(skip = 0, limit = 50, filters = {}) {
     try {
       const params = new URLSearchParams({
-        skip,
+        offset: skip,  // v1 API expects 'offset', not 'skip'
         limit,
         ...filters
       });
-      
+
       const response = await get(`/v1/incidents?${params}`);
       return {
         total: response.data?.total || 0,
@@ -219,7 +228,7 @@ export const assistantAPI = {
         query,
         history
       });
-      
+
       return {
         reply: response.data?.reply || 'No response',
         confidence: response.data?.confidence ?? 0.5,
@@ -227,7 +236,7 @@ export const assistantAPI = {
       };
     } catch (error) {
       console.error('[API] Chat error:', error);
-      
+
       // Fallback response
       return {
         reply: 'AI Assistant is currently unavailable. Please try again.',
@@ -248,7 +257,7 @@ export const assistantAPI = {
         description: incident.description,
         severity: incident.severity
       });
-      
+
       return response.data;
     } catch (error) {
       console.error('[API] Analysis error:', error);
@@ -275,6 +284,51 @@ export const assistantAPI = {
 };
 
 // ========================================
+// Dashboard API
+// ========================================
+
+export const dashboardAPI = {
+  /**
+   * Get dashboard metrics (canonical endpoint)
+   * GET /api/v1/dashboard/metrics
+   * Returns: { active_alerts, total_incidents, cameras_online, avg_response_time }
+   */
+  async getMetrics() {
+    try {
+      const response = await get('/v1/dashboard/metrics');
+      return {
+        active_alerts: response.data?.active_alerts || 0,
+        total_incidents: response.data?.total_incidents || 0,
+        cameras_online: response.data?.cameras_online || 0,
+        avg_response_time: response.data?.avg_response_time || '0m'
+      };
+    } catch (error) {
+      console.error('[API] Failed to fetch dashboard metrics:', error);
+      throw error;
+    }
+  }
+};
+
+// ========================================
+// Camera API
+// ========================================
+
+export const cameraAPI = {
+  /**
+   * Get all cameras
+   */
+  async list() {
+    try {
+      const response = await get('/v1/cameras');
+      return response.data || [];
+    } catch (error) {
+      console.error('[API] Failed to fetch cameras:', error);
+      return [];
+    }
+  }
+};
+
+// ========================================
 // System Health
 // ========================================
 
@@ -284,7 +338,7 @@ export async function getSystemHealth() {
       assistantAPI.health(),
       get('/v1/incidents?limit=1')
     ]);
-    
+
     return {
       ai: ai.status === 'fulfilled' ? ai.value : { status: 'failed' },
       incidents: incidents.status === 'fulfilled',
@@ -301,12 +355,67 @@ export async function getSystemHealth() {
   }
 }
 
-export default {
+// ========================================
+// Default Export (Unified API Client)
+// ========================================
+
+const api = {
+  // Low-level methods
+  client: apiClient,
   get,
   post,
   put,
   delete: del,
+  withRetry,
+
+  // High-level API groups
   incidents: incidentsAPI,
   assistant: assistantAPI,
-  health: getSystemHealth
+  dashboard: dashboardAPI,
+  cameras: cameraAPI,
+  health: getSystemHealth,
+
+  // Convenience methods (backward compatibility)
+  async getMetrics() {
+    return dashboardAPI.getMetrics();
+  },
+
+  async getCameras() {
+    return cameraAPI.list();
+  },
+
+  async getIncidents(skip = 0, limit = 50, filters = {}) {
+    return incidentsAPI.list(skip, limit, filters);
+  },
+
+  async getIncident(id) {
+    return incidentsAPI.get(id);
+  },
+
+  async createIncident(data) {
+    return incidentsAPI.create(data);
+  },
+
+  async updateIncident(id, data) {
+    return incidentsAPI.update(id, data);
+  },
+
+  async aiAssist(query) {
+    try {
+      return await post('/v1/ai/analyze', { query });
+    } catch (error) {
+      console.error('[API] AI assist error:', error);
+      throw error;
+    }
+  },
+
+  async aiChat(query, history = []) {
+    return assistantAPI.chat(query, history);
+  },
+
+  async aiAnalyzeIncident(incident) {
+    return assistantAPI.analyzeIncident(incident);
+  }
 };
+
+export default api;

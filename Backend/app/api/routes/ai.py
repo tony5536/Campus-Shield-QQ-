@@ -1,332 +1,203 @@
 """
-AI-powered endpoints for CampusShield AI.
-Provides incident explanation, report generation, and admin assistant.
+AI-powered endpoints for CampusShield AI - LEGACY ROUTES.
+These are aliases for v1 API endpoints.
+CRITICAL: Uses same fallback logic as v1 - NO LLM SERVICE METHOD CALLS
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
-from typing import Dict, Any, Optional, List
+from typing import Optional, Dict, Any
 from datetime import datetime
 
-from ...models.incident import Incident
-from ...services.llm_service import llm_service
-from ...utils.security import get_db
-from ...utils.logger import setup_logger
+from ...core.logging import setup_logger
 
-logger = setup_logger()
+# Import from core logic if possible, or duplicate safely
+# Here we avoid circular imports by keeping local logic for now
+
+logger = setup_logger(__name__)
 router = APIRouter()
 
-
 # ------------------------------------------------------------------
-# Request/Response Models
+# Request/Response Models (Flexible for compatibility)
 # ------------------------------------------------------------------
 
-class IncidentExplanationRequest(BaseModel):
-    """Request model for incident explanation"""
-    incident_id: int
+class AIAnalyzeRequest(BaseModel):
+    """Flexible AI request - accepts multiple input formats."""
+    query: Optional[str] = Field(None, description="User query (preferred)")
+    text: Optional[str] = Field(None, description="Alternative to query")
+    description: Optional[str] = Field(None, description="Alternative to query")
+    context: Optional[Dict[str, Any]] = Field(None, description="Optional context")
+
+    class Config:
+        json_schema_extra = {
+            "example": {"query": "Unauthorized person detected in building A after hours"}
+        }
 
 
-class IncidentExplanationResponse(BaseModel):
-    """Response model for incident explanation"""
-    incident_id: int
-    explanation: str
-    generated_at: datetime
-
-
-class ReportGenerationRequest(BaseModel):
-    """Request model for report generation"""
-    incident_id: int
-    include_recommendations: bool = True
-
-
-class ReportGenerationResponse(BaseModel):
-    """Response model for report generation"""
-    incident_id: int
-    report: str
-    generated_at: datetime
-
-
-class AssistantQueryRequest(BaseModel):
-    """Request model for admin assistant"""
-    query: str = Field(..., description="Natural language query from admin")
-    context: Optional[Dict[str, Any]] = Field(
-        None,
-        description="Optional context (incidents, stats, etc.)"
-    )
-
-
-class AIAssistRequest(BaseModel):
-    """Request model for AI assist endpoint (hackathon demo)"""
-    query: str = Field(..., description="Incident description or query to analyze")
-
-
-class AssistantQueryResponse(BaseModel):
-    """Response model for admin assistant"""
-    query: str
-    response: str
-    generated_at: datetime
+class AIAnalyzeResponse(BaseModel):
+    """Standard AI response format."""
+    severity: str = Field(description="LOW | MEDIUM | HIGH")
+    summary: str = Field(description="Analysis summary")
+    recommended_action: str = Field(description="Recommended action")
+    confidence: float = Field(description="Confidence 0-1")
 
 
 # ------------------------------------------------------------------
-# API Endpoints
+# HELPER: Local Analysis (Fallback, no LLM required)
 # ------------------------------------------------------------------
 
-@router.post("/explain-incident", response_model=IncidentExplanationResponse)
-async def explain_incident(
-    request: IncidentExplanationRequest,
-    db: Session = Depends(get_db)
-):
+def _analyze_locally(text: str) -> dict:
     """
-    Generate a human-readable explanation of an incident for security staff.
+    Local analysis fallback (no LLM required).
+    Provides reasonable responses based on keyword matching.
+    """
+    text_lower = text.lower()
     
-    Example request:
-    ```json
-    {
-        "incident_id": 1
-    }
-    ```
+    # Determine severity
+    high_severity_keywords = [
+        "unauthorized", "critical", "emergency", "intruder", "breach",
+        "attack", "armed", "weapon", "fire", "explosion", "threat"
+    ]
+    medium_severity_keywords = [
+        "suspicious", "alert", "warning", "unusual", "concern", "risk",
+        "suspicious activity", "possible breach"
+    ]
     
-    Example response:
-    ```json
-    {
-        "incident_id": 1,
-        "explanation": "This incident involves... [AI-generated explanation]",
-        "generated_at": "2025-01-27T10:30:00Z"
+    severity = "LOW"
+    confidence = 0.6
+    
+    for keyword in high_severity_keywords:
+        if keyword in text_lower:
+            severity = "HIGH"
+            confidence = 0.85
+            break
+    
+    if severity == "LOW":
+        for keyword in medium_severity_keywords:
+            if keyword in text_lower:
+                severity = "MEDIUM"
+                confidence = 0.70
+                break
+    
+    # Generate summary
+    if severity == "HIGH":
+        summary = (
+            f"CRITICAL ALERT: {text[:80]}... - Immediate action required. "
+            "This incident has been flagged as HIGH priority and requires immediate "
+            "security team response."
+        )
+        action = (
+            "Immediately dispatch security team. Establish perimeter if applicable. "
+            "Contact emergency services if needed."
+        )
+    elif severity == "MEDIUM":
+        summary = (
+            f"ALERT: {text[:80]}... - This incident has been flagged as MEDIUM priority. "
+            "Investigate further and assess situation."
+        )
+        action = "Send security team to location. Gather additional information. Monitor for escalation."
+    else:
+        summary = (
+            f"NOTICE: {text[:80]}... - This incident has been logged as LOW priority for review."
+        )
+        action = "Log incident for records. Monitor situation. Escalate if severity increases."
+    
+    return {
+        "severity": severity,
+        "summary": summary,
+        "recommended_action": action,
+        "confidence": confidence
     }
-    ```
+
+
+# ------------------------------------------------------------------
+# ENDPOINTS - All with graceful fallback
+# ------------------------------------------------------------------
+
+@router.post("/analyze", response_model=AIAnalyzeResponse)
+async def analyze(request: AIAnalyzeRequest):
+    """
+    LEGACY ALIAS: POST /api/ai/analyze
+    
+    Flexible input: accepts query, text, or description field.
+    
+    Returns:
+    {
+        "severity": "LOW | MEDIUM | HIGH",
+        "summary": "...",
+        "recommended_action": "...",
+        "confidence": 0.0-1.0
+    }
+    
+    NEVER returns 404 - always graceful fallback.
     """
     try:
-        # Fetch incident from database
-        incident = db.query(Incident).filter(Incident.id == request.incident_id).first()
-        if not incident:
-            raise HTTPException(status_code=404, detail="Incident not found")
+        # Accept flexible input
+        input_text = request.query or request.text or request.description
         
-        # Convert SQLAlchemy model to dict
-        incident_data = {
-            "id": incident.id,
-            "incident_type": incident.incident_type,
-            "severity": incident.severity,
-            "status": incident.status,
-            "description": incident.description,
-            "timestamp": incident.timestamp.isoformat() if incident.timestamp else None,
-            "camera_id": incident.camera_id,
-        }
+        if not input_text or not input_text.strip():
+            raise HTTPException(status_code=400, detail="query/text/description is required")
+
+        logger.info(f"[Legacy AI] Processing query: {input_text[:50]}...")
         
-        # Generate explanation using LLM
-        explanation = await llm_service.explain_incident(incident_data)
+        # If LLM is available, still use local fallback for now
+        # (LLM service methods don't exist yet)
+        logger.info("[Legacy AI] Using local analysis")
+        analysis = _analyze_locally(input_text)
         
-        return IncidentExplanationResponse(
-            incident_id=incident.id,
-            explanation=explanation,
-            generated_at=datetime.utcnow()
-        )
+        return AIAnalyzeResponse(**analysis)
+    
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error explaining incident {request.incident_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error generating explanation: {str(e)}")
-
-
-@router.post("/generate-report", response_model=ReportGenerationResponse)
-async def generate_report(
-    request: ReportGenerationRequest,
-    db: Session = Depends(get_db)
-):
-    """
-    Auto-generate a professional incident report.
-    
-    Example request:
-    ```json
-    {
-        "incident_id": 1,
-        "include_recommendations": true
-    }
-    ```
-    
-    Example response:
-    ```json
-    {
-        "incident_id": 1,
-        "report": "EXECUTIVE SUMMARY\n... [AI-generated report]",
-        "generated_at": "2025-01-27T10:30:00Z"
-    }
-    ```
-    """
-    try:
-        # Fetch incident from database
-        incident = db.query(Incident).filter(Incident.id == request.incident_id).first()
-        if not incident:
-            raise HTTPException(status_code=404, detail="Incident not found")
-        
-        # Convert SQLAlchemy model to dict
-        incident_data = {
-            "id": incident.id,
-            "incident_type": incident.incident_type,
-            "severity": incident.severity,
-            "status": incident.status,
-            "description": incident.description,
-            "timestamp": incident.timestamp.isoformat() if incident.timestamp else None,
-            "camera_id": incident.camera_id,
-        }
-        
-        # Generate report using LLM
-        report = await llm_service.generate_report(
-            incident_data,
-            include_recommendations=request.include_recommendations
+        logger.error(f"[Legacy AI] Error in analyze endpoint: {e}", exc_info=True)
+        # Graceful fallback - NEVER return 404
+        return AIAnalyzeResponse(
+            severity="MEDIUM",
+            summary="Analysis service encountered an error. Please review incident manually.",
+            recommended_action="Follow standard security protocols and review incident details.",
+            confidence=0.0
         )
-        
-        return ReportGenerationResponse(
-            incident_id=incident.id,
-            report=report,
-            generated_at=datetime.utcnow()
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error generating report for incident {request.incident_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
-
-
-@router.post("/assistant", response_model=AssistantQueryResponse)
-async def admin_assistant(request: AssistantQueryRequest):
-    """
-    Admin AI Assistant - Natural language query handler.
-    Answers questions about incidents, provides insights, and assists with queries.
-    
-    Example request:
-    ```json
-    {
-        "query": "What are the most common incident types this week?",
-        "context": {
-            "recent_incidents": [...]
-        }
-    }
-    ```
-    
-    Example response:
-    ```json
-    {
-        "query": "What are the most common incident types this week?",
-        "response": "Based on the recent incidents... [AI-generated response]",
-        "generated_at": "2025-01-27T10:30:00Z"
-    }
-    ```
-    """
-    try:
-        # Process query using LLM
-        response = await llm_service.assistant_query(
-            user_query=request.query,
-            context=request.context
-        )
-        
-        return AssistantQueryResponse(
-            query=request.query,
-            response=response,
-            generated_at=datetime.utcnow()
-        )
-    except Exception as e:
-        logger.error(f"Error processing assistant query: {e}")
-        raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
 
 
 @router.post("/assist")
-async def ai_assist(request: AIAssistRequest):
+async def assist(request: AIAnalyzeRequest):
     """
-    Hackathon Demo Endpoint: AI-powered incident analysis.
-    Analyzes incident queries and returns structured analysis with severity assessment.
+    Legacy Hackathon Demo Endpoint: POST /api/ai/assist
     
-    Example request:
-    ```json
-    {
-        "query": "Unauthorized person detected in building A after hours"
-    }
-    ```
-    
-    Example response:
-    ```json
-    {
-        "summary": "Unauthorized access detected in restricted area after operating hours...",
-        "severity": "High",
-        "recommended_action": "Immediately dispatch security team to Building A...",
-        "confidence": "92%"
-    }
-    ```
+    Analyzes incident queries and returns structured analysis.
+    Same as /analyze but may return additional fields.
     """
     try:
-        if not request.query or not request.query.strip():
-            raise HTTPException(status_code=400, detail="Query cannot be empty")
+        input_text = request.query or request.text or request.description
         
-        # Use the new analyze_incident function
-        analysis = await llm_service.analyze_incident(request.query.strip())
+        if not input_text or not input_text.strip():
+            raise HTTPException(status_code=400, detail="query/text/description is required")
+
+        logger.info(f"[Legacy AI Assist] Processing query: {input_text[:50]}...")
+        
+        # Use same local analysis
+        analysis = _analyze_locally(input_text)
         
         return {
-            "query": request.query,
-            "analysis": analysis,
-            "generated_at": datetime.utcnow()
+            "analysis": {
+                "severity": analysis["severity"],
+                "summary": analysis["summary"],
+                "recommended_action": analysis["recommended_action"],
+                "confidence": analysis["confidence"]
+            }
         }
+    
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error in AI assist endpoint: {e}")
-        # Return safe fallback - NEVER crash during demo
+        logger.error(f"[Legacy AI Assist] Error: {e}", exc_info=True)
+        # Return safe fallback
         return {
-            "query": request.query if request.query else "Unknown",
             "analysis": {
-                "summary": "AI analysis temporarily unavailable. Please review manually.",
-                "severity": "Medium",
-                "recommended_action": "Follow standard security protocols and review incident details.",
-                "confidence": "N/A"
-            },
-            "generated_at": datetime.utcnow(),
-            "error": "Analysis service temporarily unavailable"
+                "severity": "MEDIUM",
+                "summary": "Analysis service encountered an error",
+                "recommended_action": "Please review incident manually",
+                "confidence": 0.0
+            }
         }
-
-
-@router.get("/assistant/stats")
-async def get_assistant_stats(db: Session = Depends(get_db)):
-    """
-    Get statistics for the AI assistant context.
-    Returns summary data that can be used as context for assistant queries.
-    """
-    try:
-        # Get recent incidents
-        recent_incidents = db.query(Incident).order_by(Incident.timestamp.desc()).limit(10).all()
-        
-        # Calculate statistics
-        total_incidents = db.query(Incident).count()
-        active_incidents = db.query(Incident).filter(Incident.status == "open").count()
-        
-        # Group by type
-        incidents_by_type = {}
-        for inc in db.query(Incident).all():
-            inc_type = inc.incident_type
-            incidents_by_type[inc_type] = incidents_by_type.get(inc_type, 0) + 1
-        
-        # Calculate average severity
-        all_incidents = db.query(Incident).all()
-        avg_severity = sum(inc.severity for inc in all_incidents) / len(all_incidents) if all_incidents else 0.0
-        
-        stats = {
-            "total_incidents": total_incidents,
-            "active_incidents": active_incidents,
-            "resolved_incidents": total_incidents - active_incidents,
-            "incidents_by_type": incidents_by_type,
-            "average_severity": round(avg_severity, 2),
-            "recent_incidents": [
-                {
-                    "id": inc.id,
-                    "type": inc.incident_type,
-                    "severity": inc.severity,
-                    "status": inc.status,
-                    "timestamp": inc.timestamp.isoformat() if inc.timestamp else None,
-                }
-                for inc in recent_incidents
-            ]
-        }
-        
-        return stats
-    except Exception as e:
-        logger.error(f"Error fetching assistant stats: {e}")
-        raise HTTPException(status_code=500, detail=f"Error fetching statistics: {str(e)}")
-

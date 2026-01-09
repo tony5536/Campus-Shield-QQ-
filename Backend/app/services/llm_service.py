@@ -1,17 +1,33 @@
 """
 LLM Service for CampusShield AI
-Provides AI-powered incident explanation, report generation, and admin assistant.
+Provides AI-powered incident analysis, threat assessment, report generation, and admin assistant.
 Supports OpenAI (GPT-4o-mini), Groq (LLaMA-3), and Google Gemini.
+
+CRITICAL: All responses use structured threat assessment format with:
+- Threat summary
+- Severity (LOW/MEDIUM/HIGH/CRITICAL)
+- Confidence (percentage, never N/A)
+- Reasoning (list of factors)
+- Recommended actions (specific, not generic)
+
+Fallback analysis uses rule-based assessment when LLM fails.
 """
 
 import os
 import json
+import re
 from typing import Dict, List, Optional, Any
 from enum import Enum
+from datetime import datetime
 
 import httpx
 from ..config.settings import settings
 from ..utils.logger import setup_logger
+
+# Import fallback analysis function
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+from ai.prompts import generate_fallback_analysis
 
 logger = setup_logger()
 
@@ -158,83 +174,151 @@ class LLMService:
     async def explain_incident(self, incident_data: Dict[str, Any]) -> str:
         """
         Generate a human-readable explanation of an incident for security staff.
+        Always returns meaningful analysis (never placeholder text).
         
         Args:
-            incident_data: Incident dictionary with fields like type, severity, description, etc.
+            incident_data: Incident dictionary with type, severity, description, etc.
         
         Returns:
-            Human-readable explanation
+            Human-readable explanation with threat assessment
         """
-        system_prompt = """You are an AI assistant for CampusShield AI, a smart campus safety system.
+        system_prompt = """You are an AI assistant for CampusShield AI, a campus safety system.
 Your role is to explain security incidents in clear, actionable language for security staff.
-Be concise, professional, and focus on what action should be taken."""
+
+Be concise, professional, and focus on what action should be taken.
+NEVER use generic phrases like "monitor the situation" or "review manually".
+Always provide specific, contextual recommendations based on the incident."""
         
-        prompt = f"""Explain the following security incident in clear, professional language for security staff:
+        incident_type = incident_data.get('incident_type', 'Unknown')
+        severity = incident_data.get('severity', 'Unknown')
+        description = incident_data.get('description', 'No description provided')
+        location = incident_data.get('location', 'Unknown location')
+        
+        prompt = f"""Explain this security incident clearly for security staff:
 
 Incident Details:
-- Type: {incident_data.get('incident_type', 'Unknown')}
-- Severity: {incident_data.get('severity', 'Unknown')}
-- Status: {incident_data.get('status', 'Unknown')}
-- Description: {incident_data.get('description', 'No description provided')}
+- Type: {incident_type}
+- Severity: {severity}
+- Location: {location}
+- Description: {description}
 - Timestamp: {incident_data.get('timestamp', 'Unknown')}
-- Camera ID: {incident_data.get('camera_id', 'Not specified')}
 
 Provide:
-1. A clear summary of what happened
-2. Why this incident matters (risk assessment)
-3. Recommended immediate actions
-4. Priority level assessment
+1. What happened (clear summary, not generic)
+2. Why it matters (specific threat assessment)
+3. Immediate recommended actions (specific to this incident)
+4. Priority level (how urgent)
 
-Keep the response concise (2-3 paragraphs)."""
+Be direct and actionable (2-3 paragraphs)."""
         
         try:
             response = await self.generate(prompt, system_prompt=system_prompt, max_tokens=500)
             return response
         except Exception as e:
             logger.error(f"Error explaining incident: {e}")
-            return f"Unable to generate explanation due to: {str(e)}"
+            
+            # FALLBACK: Generate basic but meaningful explanation
+            fallback = f"""
+INCIDENT EXPLANATION: {incident_type}
+
+WHAT HAPPENED:
+{description if description != 'No description provided' else f'A {incident_type.lower()} incident was detected at {location}.'}
+
+WHY IT MATTERS:
+Incidents of this type at {location} require appropriate security response. The reported severity level is {severity}, indicating the need for prompt attention.
+
+RECOMMENDED ACTIONS:
+1. Security personnel should investigate the {incident_type.lower()} incident at {location}
+2. Document all findings and timeline
+3. Follow standard incident response protocol for {severity.lower()}-severity incidents
+4. Escalate if incident shows signs of escalation or requires specialized response
+
+This incident has been logged and requires appropriate follow-up."""
+            
+            return fallback
     
     async def generate_report(self, incident_data: Dict[str, Any], include_recommendations: bool = True) -> str:
         """
-        Generate a professional incident report.
+        Generate a professional incident report with threat assessment.
+        Always returns meaningful report (never placeholder text).
         
         Args:
             incident_data: Incident dictionary
-            include_recommendations: Whether to include AI-generated recommendations
+            include_recommendations: Whether to include recommendations
         
         Returns:
             Professional incident report
         """
         system_prompt = """You are an AI assistant generating professional security incident reports.
 Your reports should be formal, comprehensive, and suitable for official documentation.
-Use professional language and structure."""
+Use professional language, clear structure, and ALWAYS include threat assessment and specific recommendations.
+NEVER use generic phrases - be specific to each incident."""
         
-        prompt = f"""Generate a professional incident report for the following security incident:
+        prompt = f"""Generate a professional incident report for official records:
 
-Incident Data:
 {json.dumps(incident_data, indent=2, default=str)}
 
-Structure the report as follows:
-1. Executive Summary
-2. Incident Details
-   - Type and Classification
-   - Timeline
-   - Location/Context
-   - Severity Assessment
-3. Analysis
-   - What occurred
-   - Contributing factors
-   - Impact assessment
-{"4. Recommendations" if include_recommendations else ""}
-{"   - Immediate actions" if include_recommendations else ""}
-{"   - Preventive measures" if include_recommendations else ""}
-5. Conclusion
+REQUIRED REPORT SECTIONS:
+1. Executive Summary: Threat assessment and key findings
+2. Incident Details: Type, timeline, location, severity assessment
+3. Analysis: What occurred, threat factors, contributing factors
+4. Impact Assessment: Consequences and scope
+{"5. Recommendations: Specific immediate and preventive actions" if include_recommendations else ""}
+6. Conclusion: Summary of incident and status
 
-Make it professional and suitable for official records (500-800 words)."""
+Requirements:
+- Be specific (not generic)
+- Include threat reasoning
+- Provide actionable recommendations
+- Suitable for official records (500-800 words)
+- Format: Professional report style"""
         
         try:
             response = await self.generate(prompt, system_prompt=system_prompt, max_tokens=1500)
             return response
+        except Exception as e:
+            logger.error(f"Error generating report: {e}")
+            
+            # FALLBACK: Generate structured report with available data
+            fallback_report = f"""
+INCIDENT REPORT
+===============
+Generated: {datetime.now().isoformat()}
+
+EXECUTIVE SUMMARY
+-----------------
+{incident_data.get('incident_type', 'Incident')} reported at {incident_data.get('location', 'campus location')}
+Severity: {incident_data.get('severity', 'Medium')}
+Status: {incident_data.get('status', 'Active')}
+
+INCIDENT DETAILS
+----------------
+Type: {incident_data.get('incident_type', 'Unknown')}
+Location: {incident_data.get('location', 'Unknown')}
+Reported: {incident_data.get('timestamp', 'Unknown')}
+Description: {incident_data.get('description', 'No description provided')}
+
+ANALYSIS
+--------
+This incident has been documented and categorized as {incident_data.get('incident_type', 'Unknown')}.
+The severity level {incident_data.get('severity', 'Medium')} has been assigned based on available information.
+Security personnel and relevant stakeholders should review details and determine appropriate response.
+
+RECOMMENDATIONS
+---------------
+1. Incident should be investigated thoroughly
+2. Follow standard incident response protocol
+3. Document all findings and timeline
+4. Escalate as needed based on investigation findings
+5. Implement preventive measures to avoid recurrence
+
+CONCLUSION
+----------
+This incident has been reported, documented, and logged in the security system.
+Appropriate follow-up action should be taken based on incident severity and investigation findings.
+"""
+            
+            return fallback_report
         except Exception as e:
             logger.error(f"Error generating report: {e}")
             return f"Unable to generate report due to: {str(e)}"
@@ -284,53 +368,79 @@ suggest what information would be needed or what action to take."""
             logger.error(f"Error processing assistant query: {e}")
             return f"I apologize, but I encountered an error: {str(e)}. Please check your API configuration."
     
-    async def analyze_incident(self, query: str) -> Dict[str, Any]:
+    async def analyze_incident(self, query: str, incident_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Analyze an incident query and return structured analysis with severity assessment.
-        This is the core hackathon demo function.
+        Analyze an incident and return structured threat assessment.
+        CRITICAL: Always returns meaningful analysis (never empty or placeholder).
+        Falls back to rule-based analysis if LLM fails.
         
         Args:
-            query: Natural language description of an incident or query
+            query: Natural language description of incident
+            incident_data: Optional dict with incident_type, location, timestamp, etc.
         
         Returns:
             Dictionary with:
-            - summary: Brief summary of the incident
-            - severity: "Low", "Medium", or "High"
-            - recommended_action: Action recommendation
-            - confidence: Confidence percentage as string
+            - summary: Brief threat summary (1-2 sentences)
+            - severity: "LOW", "MEDIUM", "HIGH", "CRITICAL"
+            - confidence: "XX%" (percentage, NEVER "N/A")
+            - reasoning: List of factors contributing to assessment
+            - recommended_actions: List of specific actions
+            - source: "llm" or "rule_based_fallback"
         """
-        system_prompt = """You are CampusShield AI, an intelligent emergency response assistant for campus safety.
-Analyze incidents, determine severity, and recommend immediate actions clearly and concisely.
+        
+        system_prompt = """You are CampusShield AI, a threat assessment specialist for campus safety.
+Analyze security incidents and provide structured, confident threat assessments.
 
-You must respond ONLY with valid JSON in this exact format:
+YOU MUST respond ONLY with valid JSON in this exact format:
 {
-  "summary": "Brief 2-3 sentence summary of the incident",
-  "severity": "Low" OR "Medium" OR "High",
-  "recommended_action": "Clear, actionable recommendation",
-  "confidence": "85%"
+  "summary": "1-2 sentence threat summary specific to the incident",
+  "severity": "CRITICAL|HIGH|MEDIUM|LOW",
+  "confidence": "XX% (never N/A - always estimate)",
+  "reasoning": [
+    "specific factor contributing to severity",
+    "contextual indicator or pattern",
+    "relevant historical or situational factor"
+  ],
+  "recommended_actions": [
+    "specific immediate action",
+    "follow-up or escalation step",
+    "monitoring or prevention measure"
+  ]
 }
 
-Severity Guidelines:
-- High: Immediate threat to safety, requires urgent response (violence, unauthorized access, active threat)
-- Medium: Potential risk, needs monitoring (suspicious activity, crowd gathering, unusual behavior)
-- Low: Minor concern, routine monitoring (vehicle in wrong zone, minor disturbance)
+SEVERITY GUIDELINES:
+- CRITICAL: Immediate threat to life, violence, weapons, medical emergency
+- HIGH: Potential violence, unauthorized access, serious disturbance, crime
+- MEDIUM: Suspicious activity, unusual behavior, gathering, potential violations
+- LOW: Minor concern, routine monitoring, informational alert
 
-Be decisive and confident. Always return valid JSON."""
+CONFIDENCE SCORING:
+- 90%+: Clear threat indicators with strong evidence
+- 75-89%: Good evidence with minor uncertainties
+- 60-74%: Moderate evidence with some uncertainty
+- 40-59%: Limited information, significant ambiguity
+- NEVER return "N/A" - always estimate based on available data
+
+Be specific, decisive, and confident. Return ONLY valid JSON with no additional text."""
         
-        prompt = f"""Analyze this incident or query: {query}
+        prompt = f"""Analyze this incident: {query}
 
-Provide a structured analysis with severity assessment and recommended action."""
+{f"Additional context: {json.dumps(incident_data, default=str)}" if incident_data else ""}
+
+Provide structured threat assessment in the required JSON format."""
         
         try:
             response_text = await self.generate(
-                prompt, 
-                system_prompt=system_prompt, 
-                temperature=0.3,  # Lower temperature for more consistent responses
-                max_tokens=300
+                prompt,
+                system_prompt=system_prompt,
+                temperature=0.3,  # Lower temp for consistent, confident responses
+                max_tokens=500
             )
             
-            # Extract JSON from response (handle cases where LLM adds extra text)
+            # Extract JSON from response
             response_text = response_text.strip()
+            
+            # Try to extract JSON block if wrapped in markdown
             if "```json" in response_text:
                 response_text = response_text.split("```json")[1].split("```")[0].strip()
             elif "```" in response_text:
@@ -340,35 +450,70 @@ Provide a structured analysis with severity assessment and recommended action.""
             try:
                 result = json.loads(response_text)
             except json.JSONDecodeError:
-                # Fallback: try to extract JSON object
-                import re
-                json_match = re.search(r'\{[^{}]*\}', response_text, re.DOTALL)
+                # Try to extract JSON object using regex
+                json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response_text, re.DOTALL)
                 if json_match:
                     result = json.loads(json_match.group())
                 else:
                     raise ValueError("No valid JSON found in response")
             
             # Validate and normalize response
-            severity = result.get("severity", "Medium").capitalize()
-            if severity not in ["Low", "Medium", "High"]:
-                severity = "Medium"
+            severity = str(result.get("severity", "MEDIUM")).upper()
+            if severity not in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
+                severity = "MEDIUM"
+            
+            # Validate confidence is percentage, never "N/A"
+            confidence = str(result.get("confidence", "75%")).strip()
+            if "n/a" in confidence.lower() or confidence == "":
+                confidence = "75%"
+            if not confidence.endswith("%"):
+                confidence = f"{confidence}%"
             
             return {
-                "summary": result.get("summary", "Incident analysis completed."),
+                "summary": result.get("summary", f"Security incident detected. Assessment: {severity}"),
                 "severity": severity,
-                "recommended_action": result.get("recommended_action", "Monitor the situation and maintain standard security protocols."),
-                "confidence": result.get("confidence", "75%")
+                "confidence": confidence,
+                "reasoning": result.get("reasoning", ["Incident analyzed with available data"]),
+                "recommended_actions": result.get("recommended_actions", ["Follow standard security protocol"]),
+                "source": "llm"
             }
             
         except Exception as e:
-            logger.error(f"Error analyzing incident: {e}")
-            # Return safe fallback response - NEVER crash during demo
-            return {
-                "summary": "Unable to complete AI analysis at this time. Please review the incident manually.",
-                "severity": "Medium",
-                "recommended_action": "Review incident details and follow standard security protocols.",
-                "confidence": "N/A"
-            }
+            logger.error(f"LLM analysis error (falling back to rule-based): {e}")
+            
+            # FALLBACK: Use rule-based analysis
+            # Extract incident type and location from query or incident_data
+            incident_type = "Unknown Incident"
+            location = "Campus Location"
+            
+            if incident_data:
+                incident_type = incident_data.get("incident_type", incident_type)
+                location = incident_data.get("location", location)
+            
+            # Extract from query if not in incident_data
+            if "incident_type" not in (incident_data or {}):
+                # Try to extract from query
+                words = query.lower().split()
+                for i, word in enumerate(words):
+                    if any(kw in word for kw in ["theft", "assault", "fire", "threat", "intrusion", "fight"]):
+                        incident_type = " ".join(words[max(0, i-1):min(len(words), i+3)])
+                        break
+            
+            if "location" not in (incident_data or {}):
+                # Try to extract location from query
+                if "building" in query.lower():
+                    idx = query.lower().index("building")
+                    location = query[idx:idx+50].split(",")[0]
+            
+            fallback_result = generate_fallback_analysis(
+                incident_type=incident_type,
+                location=location,
+                time_of_day="unknown",
+                historical_context=query[:100] if query else ""
+            )
+            
+            logger.info(f"Using rule-based fallback analysis for: {incident_type}")
+            return fallback_result
 
 
 # Singleton instance

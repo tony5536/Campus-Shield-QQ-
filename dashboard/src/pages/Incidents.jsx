@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../api';
+import api from '../services/api';
 
 export default function Incidents() {
   const [incidents, setIncidents] = useState([]);
@@ -20,58 +20,16 @@ export default function Incidents() {
   const fetchIncidents = async () => {
     try {
       setLoading(true);
-      const response = await api.getIncidents();
-      const data = response.data || [];
+      const response = await api.incidents.list(0, 500);
+      const data = response.incidents || [];
       setIncidents(data);
     } catch (err) {
       console.error('Error fetching incidents:', err);
-      // Demo data fallback
-      setIncidents([
-        {
-          id: 1,
-          title: 'Unauthorized Entry - Building A',
-          description: 'Motion detected at rear entrance after hours',
-          location: 'Building A, 2nd Floor',
-          timestamp: new Date(Date.now() - 15 * 60000).toLocaleString(),
-          severity: 'critical',
-          status: 'active',
-          assignedTo: 'Security Team 1',
-          cameras: ['CAM-001', 'CAM-002'],
-        },
-        {
-          id: 2,
-          title: 'Unusual Activity - Campus Grounds',
-          description: 'Group of unidentified individuals in restricted area',
-          location: 'Campus Grounds, North Section',
-          timestamp: new Date(Date.now() - 45 * 60000).toLocaleString(),
-          severity: 'high',
-          status: 'active',
-          assignedTo: 'Security Team 2',
-          cameras: ['CAM-003', 'CAM-004'],
-        },
-        {
-          id: 3,
-          title: 'Crowd Gathering - Main Hall',
-          description: 'Unexpected gathering of 100+ individuals',
-          location: 'Main Hall, Ground Floor',
-          timestamp: new Date(Date.now() - 120 * 60000).toLocaleString(),
-          severity: 'medium',
-          status: 'resolved',
-          assignedTo: 'Security Team 1',
-          cameras: ['CAM-005'],
-        },
-        {
-          id: 4,
-          title: 'Vehicle in Restricted Zone',
-          description: 'Unknown vehicle detected in parking area',
-          location: 'Parking Lot C',
-          timestamp: new Date(Date.now() - 180 * 60000).toLocaleString(),
-          severity: 'low',
-          status: 'resolved',
-          assignedTo: 'Security Team 3',
-          cameras: ['CAM-006'],
-        },
-      ]);
+      const status = err.response?.status || 'Error';
+      const message = err.response?.data?.detail || err.message || 'Unable to load incidents';
+      console.error(`HTTP ${status} - ${message}`);
+      // Do NOT use demo data - show the error instead
+      setIncidents([]);
     } finally {
       setLoading(false);
     }
@@ -81,12 +39,12 @@ export default function Incidents() {
     let filtered = incidents;
 
     if (filterStatus !== 'all') {
-      filtered = filtered.filter((i) => (i.status ?? '').toString().toLowerCase() === filterStatus);
+      filtered = filtered.filter((i) => (i.status || '').toString().toLowerCase() === filterStatus);
     }
 
     if (filterSeverity !== 'all') {
       filtered = filtered.filter((i) => {
-        const sev = (i.severity ?? 'LOW').toString().toLowerCase();
+        const sev = (i.severity || 'low').toString().toLowerCase();
         if (filterSeverity === 'critical') return sev === 'critical' || sev === 'high';
         return sev === filterSeverity;
       });
@@ -176,34 +134,34 @@ export default function Incidents() {
           <tbody>
             {filteredIncidents.length > 0 ? (
               filteredIncidents.map((incident) => (
-                <tr key={incident.id}>
-                  <td style={{ fontWeight: '600' }}>{incident.title}</td>
-                  <td>{incident.location}</td>
-                  <td>{incident.timestamp}</td>
+                <tr key={incident.incident_id}>
+                  <td style={{ fontWeight: '600' }}>{incident.incident_type || 'Unknown'}</td>
+                  <td>{incident.location || 'Unknown'}</td>
+                  <td>{new Date(incident.timestamp).toLocaleString()}</td>
                   <td>
                     {(() => {
-                      const sev = (incident?.severity ?? 'LOW').toString().toLowerCase();
+                      const sev = (incident.severity || 'low').toString().toLowerCase();
                       return (
-                        <span className={`badge ${sev || 'medium'}`}>
-                          {sev === 'critical' || sev === 'high' ? '🔴' : sev === 'medium' ? '🟠' : '🟢'} {incident.severity ?? 'Medium'}
+                        <span className={`badge ${sev}`}>
+                          {sev === 'high' ? '🔴' : sev === 'medium' ? '🟠' : '🟢'} {sev}
                         </span>
                       );
                     })()}
                   </td>
                   <td>
                     {(() => {
-                      const statusLower = (incident?.status ?? 'ACTIVE').toString().toLowerCase();
+                      const statusLower = (incident.status || 'ACTIVE').toString().toLowerCase();
                       return (
-                        <span className={`badge ${statusLower === 'active' ? 'active' : 'low'}`}>
+                        <span className={`badge ${statusLower === 'active' ? 'active' : 'resolved'}`}>
                           {incident.status}
                         </span>
                       );
                     })()}
                   </td>
-                  <td>{incident.assignedTo}</td>
+                  <td>{incident.source || 'N/A'}</td>
                   <td>
                     <Link
-                      to={`/incident/${incident.id}`}
+                      to={`/incident/${incident.incident_id}`}
                       className="btn btn-primary"
                       style={{ fontSize: '12px', padding: '6px 12px' }}
                     >
@@ -228,16 +186,16 @@ export default function Incidents() {
         <div className="card danger">
           <div className="stat-label">Active Incidents</div>
           <div className="stat-number">
-            {filteredIncidents.filter((i) => (i.status ?? '').toString().toLowerCase() === 'active').length}
+            {filteredIncidents.filter((i) => (i.status || '').toString().toLowerCase() === 'active').length}
           </div>
         </div>
 
         <div className="card warning">
-          <div className="stat-label">Critical Severity</div>
+          <div className="stat-label">High Severity</div>
           <div className="stat-number">
             {filteredIncidents.filter((i) => {
-              const sev = (i.severity ?? 'LOW').toString().toLowerCase();
-              return sev === 'critical' || sev === 'high';
+              const sev = (i.severity || 'low').toString().toLowerCase();
+              return sev === 'high';
             }).length}
           </div>
         </div>
@@ -245,7 +203,7 @@ export default function Incidents() {
         <div className="card success">
           <div className="stat-label">Resolved</div>
           <div className="stat-number">
-            {filteredIncidents.filter((i) => (i.status ?? '').toString().toLowerCase() === 'resolved').length}
+            {filteredIncidents.filter((i) => (i.status || '').toString().toLowerCase() === 'resolved').length}
           </div>
         </div>
       </div>

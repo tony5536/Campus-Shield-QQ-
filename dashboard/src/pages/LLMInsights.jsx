@@ -59,7 +59,7 @@ const LLMInsights = () => {
   // API BASE URL
   // ========================================================================
 
-  const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
+  const API_BASE = process.env.VITE_API_BASE_URL || process.env.REACT_APP_API_BASE || 'http://localhost:8000';
 
   // ========================================================================
   // UTILITY FUNCTIONS

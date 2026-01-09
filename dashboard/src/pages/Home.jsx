@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../api';
+import api from '../services/api';
 
 export default function Home() {
   const [stats, setStats] = useState({
     totalIncidents: 0,
     activeAlerts: 0,
     camerasOnline: 0,
-    avgResponseTime: '0s',
+    avgResponseTime: '0m',
   });
   const [recentIncidents, setRecentIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,75 +20,54 @@ export default function Home() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setError(null);
       
-      // Fetch incidents
-      const incidentsRes = await api.getIncidents();
-      const incidents = incidentsRes.data || [];
+      // Fetch dashboard metrics from canonical endpoint
+      const metricsData = await api.dashboard.getMetrics();
       
-      // Fetch cameras
-      const camerasRes = await api.getCameras();
-      const cameras = camerasRes.data || [];
+      // Fetch real incidents for recent list
+      let incidents = [];
+      try {
+        const incidentsRes = await api.incidents.list(0, 5);
+        incidents = incidentsRes.incidents || [];
+      } catch (incErr) {
+        console.warn('Failed to fetch incidents:', incErr);
+      }
       
-      // Calculate stats (normalize status values)
-      const activeIncidents = incidents.filter(i => (i.status ?? '').toString().toLowerCase() === 'active').length;
-      const closedIncidents = incidents.filter(i => (i.status ?? '').toString().toLowerCase() === 'closed').length;
-      
+      // Set stats from real backend data - never use placeholders
       setStats({
-        totalIncidents: incidents.length,
-        activeAlerts: activeIncidents,
-        camerasOnline: cameras.filter(c => c.status === 'online').length,
-        avgResponseTime: '2m 34s',
+        totalIncidents: metricsData.total_incidents ?? 0,
+        activeAlerts: metricsData.active_alerts ?? 0,
+        camerasOnline: metricsData.cameras_online ?? 0,
+        avgResponseTime: metricsData.avg_response_time ?? '0m',
       });
       
       setRecentIncidents(incidents.slice(0, 5));
-      setError(null);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
-      setError('Failed to load dashboard data. Using demo data.');
-      
-      // Demo data fallback
+      const status = err.response?.status || 'Error';
+      const message = err.response?.data?.detail || err.message || 'Unable to load dashboard data';
+      setError(`${status} - ${message}`);
+      // Clear stats on error (don't show stale data)
       setStats({
-        totalIncidents: 12,
-        activeAlerts: 3,
-        camerasOnline: 24,
-        avgResponseTime: '2m 34s',
+        totalIncidents: 0,
+        activeAlerts: 0,
+        camerasOnline: 0,
+        avgResponseTime: '0m',
       });
-      
-      setRecentIncidents([
-        {
-          id: 1,
-          title: 'Unauthorized Entry - Building A',
-          timestamp: new Date(Date.now() - 15 * 60000).toLocaleString(),
-          severity: 'critical',
-          status: 'active',
-        },
-        {
-          id: 2,
-          title: 'Unusual Activity - Campus Grounds',
-          timestamp: new Date(Date.now() - 45 * 60000).toLocaleString(),
-          severity: 'high',
-          status: 'active',
-        },
-        {
-          id: 3,
-          title: 'Crowd Gathering - Main Hall',
-          timestamp: new Date(Date.now() - 120 * 60000).toLocaleString(),
-          severity: 'medium',
-          status: 'resolved',
-        },
-      ]);
+      setRecentIncidents([]);
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) return <div className="loading">Loading dashboard data</div>;
+  if (loading) return <div className="loading">Loading dashboard data...</div>;
 
   return (
     <div className="home-page">
       <h2>Dashboard Overview</h2>
       
-      {error && <div className="error">⚠️ {error}</div>}
+      {error && <div className="error" style={{color: '#c0392b', padding: '12px', backgroundColor: '#fadbd8', borderRadius: '4px', marginBottom: '20px'}}>❌ {error}</div>}
 
       {/* Stats Cards */}
       <div className="dashboard-grid">
@@ -128,7 +107,8 @@ export default function Home() {
           <table>
             <thead>
               <tr>
-                <th>Incident</th>
+                <th>Type</th>
+                <th>Location</th>
                 <th>Timestamp</th>
                 <th>Severity</th>
                 <th>Status</th>
@@ -138,31 +118,32 @@ export default function Home() {
             <tbody>
               {recentIncidents.length > 0 ? (
                 recentIncidents.map((incident) => (
-                  <tr key={incident.id}>
-                    <td>{incident.title}</td>
-                    <td>{incident.timestamp}</td>
+                  <tr key={incident.incident_id}>
+                    <td>{incident.incident_type || 'Unknown'}</td>
+                    <td>{incident.location || 'Unknown'}</td>
+                    <td>{new Date(incident.timestamp).toLocaleString()}</td>
                     <td>
                       {(() => {
-                        const sev = (incident?.severity ?? 'LOW').toString().toLowerCase();
+                        const sev = (incident.severity || 'low').toString().toLowerCase();
                         return (
-                          <span className={`badge ${sev || 'medium'}`}>
-                            {sev === 'critical' || sev === 'high' ? '🔴' : sev === 'medium' ? '🟠' : '🟢'} {incident.severity ?? 'Medium'}
+                          <span className={`badge ${sev}`}>
+                            {sev === 'high' ? '🔴' : sev === 'medium' ? '🟠' : '🟢'} {sev}
                           </span>
                         );
                       })()}
                     </td>
                     <td>
                       {(() => {
-                        const statusLower = (incident?.status ?? 'ACTIVE').toString().toLowerCase();
+                        const statusLower = (incident.status || 'ACTIVE').toString().toLowerCase();
                         return (
-                          <span className={`badge ${statusLower === 'active' ? 'active' : 'low'}`}>
+                          <span className={`badge ${statusLower === 'active' ? 'active' : 'resolved'}`}>
                             {incident.status}
                           </span>
                         );
                       })()}
                     </td>
                     <td>
-                      <Link to={`/incident/${incident.id}`} className="btn btn-primary" style={{ fontSize: '12px', padding: '6px 12px' }}>
+                      <Link to={`/incident/${incident.incident_id}`} className="btn btn-primary" style={{ fontSize: '12px', padding: '6px 12px' }}>
                         View
                       </Link>
                     </td>
@@ -170,7 +151,7 @@ export default function Home() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="5" style={{ textAlign: 'center', color: '#95a5a6' }}>
+                  <td colSpan="6" style={{ textAlign: 'center', color: '#95a5a6' }}>
                     No incidents recorded
                   </td>
                 </tr>

@@ -15,47 +15,55 @@ from langchain_openai import ChatOpenAI
 
 # Try to import LangChain components - handle missing modules gracefully
 # In LangChain 1.x, some modules were restructured or removed
-try:
-    from langchain.chains import LLMChain, RetrievalQA
-except ImportError:
-    # Try alternative import paths for LangChain 1.x
-    try:
-        from langchain_core.chains import LLMChain
-        RetrievalQA = None  # May not be available in newer versions
-    except ImportError:
-        LLMChain = None
-        RetrievalQA = None
-        logging.warning("LLMChain not available - some features may be disabled")
+import warnings
+import logging as _root_logging
+
+# Suppress warnings during LangChain import attempts
+_suppress_warnings = _root_logging.getLogger()
+_old_level = _suppress_warnings.level
 
 try:
-    from langchain.memory import ConversationBufferMemory, ConversationSummaryMemory
-except ImportError:
-    # Try alternative import paths
+    _suppress_warnings.setLevel(_root_logging.ERROR)
     try:
-        from langchain_core.memory import ConversationBufferMemory, ConversationSummaryMemory
+        from langchain.chains import LLMChain, RetrievalQA
     except ImportError:
-        ConversationBufferMemory = None
-        ConversationSummaryMemory = None
-        logging.warning("ConversationMemory not available - some features may be disabled")
+        # Try alternative import paths for LangChain 1.x
+        try:
+            from langchain_core.chains import LLMChain
+            RetrievalQA = None  # May not be available in newer versions
+        except ImportError:
+            LLMChain = None
+            RetrievalQA = None
 
-try:
-    from langchain.prompts import PromptTemplate, ChatPromptTemplate
-except ImportError:
-    # Use langchain_core.prompts which is available in LangChain 1.x
     try:
-        from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
+        from langchain.memory import ConversationBufferMemory, ConversationSummaryMemory
     except ImportError:
-        PromptTemplate = None
-        ChatPromptTemplate = None
-        logging.warning("PromptTemplate not available - some features may be disabled")
+        # Try alternative import paths
+        try:
+            from langchain_core.memory import ConversationBufferMemory, ConversationSummaryMemory
+        except ImportError:
+            ConversationBufferMemory = None
+            ConversationSummaryMemory = None
 
-try:
-    from langchain.callbacks import StreamingStdOutCallbackHandler
-except ImportError:
     try:
-        from langchain_core.callbacks import StreamingStdOutCallbackHandler
+        from langchain.prompts import PromptTemplate, ChatPromptTemplate
     except ImportError:
-        StreamingStdOutCallbackHandler = None
+        # Use langchain_core.prompts which is available in LangChain 1.x
+        try:
+            from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
+        except ImportError:
+            PromptTemplate = None
+            ChatPromptTemplate = None
+
+    try:
+        from langchain.callbacks import StreamingStdOutCallbackHandler
+    except ImportError:
+        try:
+            from langchain_core.callbacks import StreamingStdOutCallbackHandler
+        except ImportError:
+            StreamingStdOutCallbackHandler = None
+finally:
+    _suppress_warnings.setLevel(_old_level)
 
 from .prompts import (
     CHAT_TEMPLATE,

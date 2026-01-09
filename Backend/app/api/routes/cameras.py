@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List
 from ...models.camera import Camera
-from ...utils.security import get_db
+from ...core.security import get_db
 
 router = APIRouter()
 
@@ -14,6 +14,7 @@ class CameraIn(BaseModel):
 
 class CameraOut(CameraIn):
     id: int
+    status: str = "ONLINE"
 
     class Config:
         from_attributes = True
@@ -29,6 +30,17 @@ def create_camera(payload: CameraIn, db: Session = Depends(get_db)):
 @router.get("/", response_model=List[CameraOut])
 def list_cameras(db: Session = Depends(get_db)):
     cams = db.query(Camera).all()
+    if not cams:
+        # Return mock data for live view if DB is empty
+        return [
+            CameraOut(
+                id=1, 
+                name="Camera A", 
+                rtsp_url="mock://stream", 
+                location="Main Entrance", 
+                status="ONLINE"
+            )
+        ]
     return cams
 
 @router.get("/{camera_id}", response_model=CameraOut)

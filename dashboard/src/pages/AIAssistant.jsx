@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import api from '../api';
+import api from '../services/api';
 import '../App.css';
 
 export default function AIAssistant() {
@@ -38,7 +38,7 @@ export default function AIAssistant() {
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    
+
     if (!inputValue.trim() || loading) return;
 
     const userMessage = {
@@ -56,10 +56,20 @@ export default function AIAssistant() {
     setLastAnalysis(null);
 
     try {
-      // Use the new /api/ai/assist endpoint for hackathon demo
+      // Use the new /api/v1/ai/analyze endpoint via services/api
+      // Note: api.aiAssist now calls /v1/ai/analyze which returns { severity, summary, recommended_action, confidence }
       const response = await api.aiAssist(queryText);
-      
-      const analysis = response.data?.analysis || {};
+
+      // services/api.aiAssist returns the Axios response object
+      // We need response.data to get the actual payload
+      const data = response.data || {};
+
+      const analysis = {
+        severity: data.severity || 'MEDIUM',
+        summary: data.summary || 'Analysis completed.',
+        recommended_action: data.recommended_action || 'Review incident details.',
+        confidence: data.confidence || 0.5
+      };
       setLastAnalysis(analysis);
 
       const aiMessage = {
@@ -75,25 +85,16 @@ export default function AIAssistant() {
       console.error('Error sending message:', err);
       const errorMsg = err.response?.data?.detail || err.message || 'Failed to get AI response. Please try again.';
       setError(errorMsg);
-      
-      // Fallback response - NEVER crash during demo
-      const fallbackAnalysis = {
-        summary: 'AI analysis temporarily unavailable. Please review the incident manually.',
-        severity: 'Medium',
-        recommended_action: 'Follow standard security protocols.',
-        confidence: 'N/A'
-      };
-      
+
+      // Show the real error message instead of fallback
       const errorMessage = {
         id: Date.now() + 1,
         role: 'assistant',
-        content: fallbackAnalysis.summary,
-        analysis: fallbackAnalysis,
+        content: `Error: ${errorMsg}`,
         timestamp: new Date(),
       };
-      
+
       setMessages((prev) => [...prev, errorMessage]);
-      setLastAnalysis(fallbackAnalysis);
     } finally {
       setLoading(false);
     }
@@ -154,12 +155,11 @@ export default function AIAssistant() {
 
       {/* Last Analysis Result Card - VISUAL IMPACT */}
       {lastAnalysis && (
-        <div className="card" style={{ 
-          marginBottom: '24px', 
-          borderLeft: `5px solid ${
-            (lastAnalysis?.severity ?? 'LOW').toString().toLowerCase() === 'high' ? '#e74c3c' :
+        <div className="card" style={{
+          marginBottom: '24px',
+          borderLeft: `5px solid ${(lastAnalysis?.severity ?? 'LOW').toString().toLowerCase() === 'high' ? '#e74c3c' :
             (lastAnalysis?.severity ?? 'LOW').toString().toLowerCase() === 'medium' ? '#f39c12' : '#27ae60'
-          }`
+            }`
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
             <span className={`severity-badge ${getSeverityClass(lastAnalysis.severity)}`}>
@@ -169,20 +169,19 @@ export default function AIAssistant() {
               Confidence: {lastAnalysis.confidence || 'N/A'}
             </span>
           </div>
-          
+
           <div style={{ marginBottom: '16px' }}>
             <h4 style={{ color: '#2c3e50', marginBottom: '8px' }}>📋 Summary</h4>
             <p style={{ color: '#34495e', lineHeight: '1.6' }}>{lastAnalysis.summary}</p>
           </div>
-          
-            <div style={{ 
-            padding: '16px', 
-            backgroundColor: '#f8f9fa', 
+
+          <div style={{
+            padding: '16px',
+            backgroundColor: '#f8f9fa',
             borderRadius: '8px',
-            borderLeft: `4px solid ${
-              (lastAnalysis?.severity ?? 'LOW').toString().toLowerCase() === 'high' ? '#e74c3c' :
+            borderLeft: `4px solid ${(lastAnalysis?.severity ?? 'LOW').toString().toLowerCase() === 'high' ? '#e74c3c' :
               (lastAnalysis?.severity ?? 'LOW').toString().toLowerCase() === 'medium' ? '#f39c12' : '#27ae60'
-            }`
+              }`
           }}>
             <h4 style={{ color: '#2c3e50', marginBottom: '8px' }}>💡 Recommended Action</h4>
             <p style={{ color: '#34495e', lineHeight: '1.6', fontWeight: '500' }}>
@@ -250,7 +249,7 @@ export default function AIAssistant() {
               </div>
             ))
           )}
-          
+
           {loading && (
             <div className="message assistant" style={{ marginBottom: '16px' }}>
               <div
@@ -267,7 +266,7 @@ export default function AIAssistant() {
               </div>
             </div>
           )}
-          
+
           <div ref={messagesEndRef} />
         </div>
 
@@ -291,7 +290,7 @@ export default function AIAssistant() {
               ⚠️ {error}
             </div>
           )}
-          
+
           <form onSubmit={sendMessage} className="chat-input-form">
             <div style={{ display: 'flex', gap: '12px' }}>
               <input
